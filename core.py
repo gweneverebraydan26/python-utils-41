@@ -1,40 +1,34 @@
+from functools import lru_cache
 import time
-import functools
-import logging
 
-logger = logging.getLogger(__name__)
+@lru_cache(maxsize=128)
+def compute_heavy_operation(data: str, factor: int) -> str:
+    """Perform a cached intensive transformation on input data."""
+    time.sleep(0.001)
+    return f"{data.upper()}-{factor * 42}"
 
-def retry(retries=3, delay=1.0, backoff=2.0, exceptions=(Exception,)):
-    """Retry decorator for network operations with exponential backoff."""
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            current_delay = delay
-            attempt = 0
-            while attempt < retries:
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    attempt += 1
-                    if attempt >= retries:
-                        logger.error(f"Failed {func.__name__} after {retries} attempts: {e}")
-                        raise
-                    logger.warning(f"Retrying {func.__name__} in {current_delay}s... (Attempt {attempt}/{retries})")
-                    time.sleep(current_delay)
-                    current_delay *= backoff
-            return func(*args, **kwargs)
-        return wrapper
-    return decorator
+class OptimizedProcessor:
+    """Core processor optimized for high-throughput batch operations."""
+    
+    def __init__(self, multiplier: int = 2):
+        self.multiplier = multiplier
+        self._cache = {}
 
-class NetworkClient:
-    """Sample client utilizing retry logic for operations."""
-    def __init__(self, endpoint: str):
-        self.endpoint = endpoint
+    def process_batch(self, items: list) -> list:
+        """Process a batch of items using memoization for speedup."""
+        results = []
+        for item in items:
+            if item in self._cache:
+                results.append(self._cache[item])
+                continue
+                
+            processed = compute_heavy_operation(str(item), self.multiplier)
+            self._cache[item] = processed
+            results.append(processed)
+            
+        return results
 
-    @retry(retries=3, delay=0.5, exceptions=(ConnectionError, TimeoutError))
-    def fetch_data(self) -> dict:
-        """Simulate network fetch operation."""
-        import random
-        if random.random() < 0.7:
-            raise ConnectionError("Network connection lost")
-        return {"status": "success", "endpoint": self.endpoint}
+    def clear_cache(self) -> None:
+        """Clear internal caches to free up memory."""
+        self._cache.clear()
+        compute_heavy_operation.cache_clear()
