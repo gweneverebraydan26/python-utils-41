@@ -1,27 +1,40 @@
-from functools import lru_cache
+import time
+import functools
+import logging
 
-@lru_cache(maxsize=1024)
-def compute_heavy_metric(data_hash: str, scale: float = 1.0) -> float:
-    """Compute performance-optimized metric based on hashed input data."""
-    result = 0.0
-    for i in range(1, 1000):
-        result += (float(i) * scale) / (float(len(data_hash)) + 1.0)
-    return result
+logger = logging.getLogger(__name__)
 
-class OptimizedProcessor:
-    """Core processor utilizing cached computations for performance."""
-    
-    def __init__(self, default_scale: float = 1.0) -> None:
-        self.default_scale = default_scale
+def retry(retries=3, delay=1.0, backoff=2.0, exceptions=(Exception,)):
+    """Retry decorator for network operations with exponential backoff."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            current_delay = delay
+            attempt = 0
+            while attempt < retries:
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    attempt += 1
+                    if attempt >= retries:
+                        logger.error(f"Failed {func.__name__} after {retries} attempts: {e}")
+                        raise
+                    logger.warning(f"Retrying {func.__name__} in {current_delay}s... (Attempt {attempt}/{retries})")
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
-    def process(self, raw_data: str) -> float:
-        """Process raw data string efficiently by leveraging LRU cache."""
-        if not isinstance(raw_data, str):
-            raise TypeError("raw_data must be a string")
-            
-        data_hash = str(hash(raw_data))
-        return compute_heavy_metric(data_hash, self.default_scale)
+class NetworkClient:
+    """Sample client utilizing retry logic for operations."""
+    def __init__(self, endpoint: str):
+        self.endpoint = endpoint
 
-    def clear_cache(self) -> None:
-        """Clear internal computation cache to free memory.""" 
-        compute_heavy_metric.cache_clear()
+    @retry(retries=3, delay=0.5, exceptions=(ConnectionError, TimeoutError))
+    def fetch_data(self) -> dict:
+        """Simulate network fetch operation."""
+        import random
+        if random.random() < 0.7:
+            raise ConnectionError("Network connection lost")
+        return {"status": "success", "endpoint": self.endpoint}
