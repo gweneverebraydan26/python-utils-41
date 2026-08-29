@@ -1,67 +1,50 @@
 import logging
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
+import os
 
-def configure_rotating_logger(
-    logger_name: str = "app",
-    log_file: str = "logs/app.log",
-    max_size_mb: int = 10,
+def setup_logger(
+    name: str = "app",
+    log_file: str = "app.log",
+    level: int = logging.INFO,
+    max_bytes: int = 5 * 1024 * 1024,
     backup_count: int = 5,
-    log_level: int = logging.INFO
+    console: bool = True
 ) -> logging.Logger:
-    """Configure a logger with rotating file handler and console output.
+    """Configure logger with rotating file handler.
 
-    Creates the log directory if it doesn't exist.
+    Sets up logging to file with automatic rotation based on size.
+    Optionally adds console output.
     """
-    logger = logging.getLogger(logger_name)
-    if logger.hasHandlers():
-        logger.handlers.clear()
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
 
-    logger.setLevel(log_level)
+    # Avoid adding handlers multiple times
+    if logger.handlers:
+        return logger
 
-    # Ensure log directory exists
-    log_path = Path(log_file)
-    log_path.parent.mkdir(parents=True, exist_ok=True)
+    # Create directory for log file if needed
+    log_dir = os.path.dirname(log_file)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir)
 
-    # Rotating file handler setup
-    max_bytes = max_size_mb * 1024 * 1024
+    # Set up rotating file handler
     file_handler = RotatingFileHandler(
-        filename=str(log_path),
-        maxBytes=max_bytes,
-        backupCount=backup_count,
-        encoding="utf-8"
+        log_file, maxBytes=max_bytes, backupCount=backup_count
     )
-    file_handler.setLevel(log_level)
+    file_handler.setLevel(level)
 
-    # Console handler for immediate feedback
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(log_level)
-
-    # Common formatter
+    # Standard formatter for timestamps and levels
     formatter = logging.Formatter(
-        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
     file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
-
     logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
 
-    logger.info("Rotating logger configured successfully")
+    # Add console handler if requested
+    if console:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(level)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+
     return logger
-
-# Example usage
-if __name__ == "__main__":
-    app_logger = configure_rotating_logger(
-        logger_name="python-utils",
-        log_file="logs/utils.log",
-        max_size_mb=5,
-        backup_count=3
-    )
-    app_logger.info("Application started")
-    app_logger.warning("This is a warning message")
-    app_logger.error("Example error for testing")
-    # Simulate many messages
-    for i in range(100):
-        app_logger.debug(f"Debug message number {i}")
