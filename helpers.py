@@ -1,68 +1,68 @@
-import json
 import os
-from typing import Any, Dict, Optional, Union
+import json
+from typing import Any, List, Dict, Optional
+from datetime import datetime
 
-def safe_divide(a: Union[int, float], b: Union[int, float]) -> Optional[float]:
-    """Safely divide two numbers handling division by zero and invalid types."""
-    try:
-        if b == 0:
-            return None
-        return float(a) / float(b)
-    except (TypeError, ValueError, ZeroDivisionError):
-        return None
-
-def safe_dict_get(data: Optional[Dict[str, Any]], key: str, default: Any = None) -> Any:
-    """Retrieve value from dict with checks for None and missing keys."""
-    if data is None or not isinstance(data, dict):
-        return default
-    try:
-        return data.get(key, default)
-    except Exception:
-        return default
-
-def safe_parse_int(value: Any, default: int = 0) -> int:
-    """Convert value to int handling various edge cases."""
-    if value is None:
-        return default
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        try:
-            return int(float(value))
-        except (ValueError, TypeError):
-            return default
-
-def safe_read_file(filepath: str) -> str:
-    """Read file content with error handling for common issues."""
-    if not filepath or not isinstance(filepath, str):
-        return ""
-    if not os.path.exists(filepath):
-        return ""
-    if not os.access(filepath, os.R_OK):
-        return ""
+def read_file(filepath: str) -> Optional[str]:
+    """Read file content safely, return None on error."""
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             return f.read()
-    except (IOError, OSError, UnicodeDecodeError):
-        return ""
-    except Exception:
-        return ""
+    except (IOError, OSError):
+        return None
 
-def load_and_process_json(filepath: str) -> Dict[str, Any]:
-    """Load JSON and process it safely handling edge cases."""
-    content = safe_read_file(filepath)
-    if not content:
-        return {}
+def write_file(filepath: str, content: str) -> bool:
+    """Write content to file, return True on success."""
     try:
-        data = json.loads(content)
-        if not isinstance(data, dict):
-            return {}
-        processed = {}
-        for k, v in data.items():
-            if isinstance(k, str):
-                processed[k] = safe_parse_int(v)
-        return processed
-    except json.JSONDecodeError:
-        return {}
-    except Exception:
-        return {}
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(content)
+        return True
+    except (IOError, OSError):
+        return False
+
+def flatten_list(items: List[Any]) -> List[Any]:
+    """Flatten a nested list into a single list."""
+    result = []
+    for item in items:
+        if isinstance(item, list):
+            result.extend(flatten_list(item))
+        else:
+            result.append(item)
+    return result
+
+def chunk_list(items: List[Any], size: int) -> List[List[Any]]:
+    """Split list into chunks of given size."""
+    if size <= 0:
+        return []
+    return [items[i:i + size] for i in range(0, len(items), size)]
+
+def get_file_extension(filename: str) -> str:
+    """Return the file extension including dot."""
+    return os.path.splitext(filename)[1]
+
+def parse_json(data: str) -> Optional[Dict[str, Any]]:
+    """Parse JSON string safely, return None on error."""
+    try:
+        return json.loads(data)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+def get_timestamp() -> str:
+    """Return current timestamp as ISO string."""
+    return datetime.now().isoformat()
+
+def merge_dicts(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge two dictionaries, second overrides first."""
+    result = dict1.copy()
+    result.update(dict2)
+    return result
+
+def remove_duplicates(items: List[Any]) -> List[Any]:
+    """Remove duplicate items preserving order."""
+    seen = set()
+    result = []
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
