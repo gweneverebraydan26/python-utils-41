@@ -1,52 +1,68 @@
-from typing import Any, Dict, List, Union
+import json
+import os
+from typing import Any, Dict, Optional, Union
 
+def safe_divide(a: Union[int, float], b: Union[int, float]) -> Optional[float]:
+    """Safely divide two numbers handling division by zero and invalid types."""
+    try:
+        if b == 0:
+            return None
+        return float(a) / float(b)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
 
-def deep_merge(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
-    """Recursively merge two dictionaries."""
-    result = dict1.copy()
-    for key, value in dict2.items():
-        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-            result[key] = deep_merge(result[key], value)
-        else:
-            result[key] = value
-    return result
+def safe_dict_get(data: Optional[Dict[str, Any]], key: str, default: Any = None) -> Any:
+    """Retrieve value from dict with checks for None and missing keys."""
+    if data is None or not isinstance(data, dict):
+        return default
+    try:
+        return data.get(key, default)
+    except Exception:
+        return default
 
-
-def chunk_list(data: List[Any], size: int) -> List[List[Any]]:
-    """Split a list into chunks of a specified size."""
-    if size <= 0:
-        raise ValueError("Chunk size must be greater than zero.")
-    return [data[i:i + size] for i in range(0, len(data), size)]
-
-
-def flatten_dict(nested_dict: Dict[str, Any], parent_key: str = "", sep: str = ".") -> Dict[str, Any]:
-    """Flatten a nested dictionary using a separator."""
-    items: List[tuple] = []
-    for k, v in nested_dict.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
-
-
-def safe_get(data: Union[Dict[str, Any], List[Any]], path: str, default: Any = None) -> Any:
-    """Safely retrieve nested dictionary or list value using dot notation."""
-    keys = path.replace("[", ".").replace("]", "").split(".")
-    current = data
-    
-    for key in keys:
-        if not key:
-            continue
+def safe_parse_int(value: Any, default: int = 0) -> int:
+    """Convert value to int handling various edge cases."""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
         try:
-            if isinstance(current, dict):
-                current = current[key]
-            elif isinstance(current, list):
-                current = current[int(key)]
-            else:
-                return default
-        except (KeyError, IndexError, ValueError, TypeError):
+            return int(float(value))
+        except (ValueError, TypeError):
             return default
-            
-    return current
+
+def safe_read_file(filepath: str) -> str:
+    """Read file content with error handling for common issues."""
+    if not filepath or not isinstance(filepath, str):
+        return ""
+    if not os.path.exists(filepath):
+        return ""
+    if not os.access(filepath, os.R_OK):
+        return ""
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return f.read()
+    except (IOError, OSError, UnicodeDecodeError):
+        return ""
+    except Exception:
+        return ""
+
+def load_and_process_json(filepath: str) -> Dict[str, Any]:
+    """Load JSON and process it safely handling edge cases."""
+    content = safe_read_file(filepath)
+    if not content:
+        return {}
+    try:
+        data = json.loads(content)
+        if not isinstance(data, dict):
+            return {}
+        processed = {}
+        for k, v in data.items():
+            if isinstance(k, str):
+                processed[k] = safe_parse_int(v)
+        return processed
+    except json.JSONDecodeError:
+        return {}
+    except Exception:
+        return {}
