@@ -1,34 +1,31 @@
-import logging
+import json
+from typing import Any, Optional, Dict
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+def safe_json_load(data: str, default: Any = None) -> Any:
+    """Parses a string into a python object with fallback."""
+    try:
+        return json.loads(data)
+    except (ValueError, TypeError):
+        return default
 
-def validate_input(data):
-    """Ensures input is a non-empty dictionary with required keys."""
-    if not isinstance(data, dict):
-        raise ValueError("Input must be a dictionary")
-    if "id" not in data or "payload" not in data:
-        raise KeyError("Missing required keys: id, payload")
-    return True
+def deep_get(dictionary: Dict, keys: str, delimiter: str = '.') -> Any:
+    """Access nested dictionary keys via string path."""
+    parts = keys.split(delimiter)
+    current = dictionary
+    try:
+        for part in parts:
+            current = current[part]
+        return current
+    except (KeyError, TypeError):
+        return None
 
-def process_items(items):
-    """Main processing loop with integrated input validation."""
-    results = []
-    for item in items:
-        try:
-            if validate_input(item):
-                logger.info(f"Processing item {item['id']}")
-                # Simulated transformation logic
-                processed = {"id": item["id"], "status": "success"}
-                results.append(processed)
-        except (ValueError, KeyError) as e:
-            logger.error(f"Skipping invalid item: {e}")
-            continue
-        except Exception as e:
-            logger.critical(f"Unexpected failure: {e}")
-            break
-    return results
-
-if __name__ == "__main__":
-    data_stream = [{"id": 1, "payload": "test"}, "invalid", {"id": 2, "payload": "data"}]
-    process_items(data_stream)
+def flatten_dict(d: Dict, parent_key: str = '', sep: str = '_') -> Dict:
+    """Flattens a nested dictionary into a single level."""
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
