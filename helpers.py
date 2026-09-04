@@ -1,39 +1,46 @@
-import math
-from typing import Any, Dict, Optional
+from typing import Any, List, Optional, Type, TypeVar
 
-def safe_get_nested(data: Optional[Dict[str, Any]], path: str, default: Any = None) -> Any:
-    """
-    Safely retrieves a value from a nested dictionary using a dot-separated path.
-    Handles edge cases such as None inputs, missing keys, or non-dict structures.
-    """
-    if not path:
-        return default
-    if data is None or not isinstance(data, dict):
+T = TypeVar("T")
+
+
+def safe_get(target_dict: Any, keys: List[str], default: Optional[Any] = None) -> Any:
+    """Safely retrieve nested values from a dictionary without raising exceptions."""
+    if not isinstance(target_dict, dict):
         return default
 
-    keys = path.split('.')
-    current = data
+    current = target_dict
     for key in keys:
-        if isinstance(current, dict) and key in current:
-            current = current[key]
-        else:
+        if not isinstance(current, dict) or key not in current:
             return default
+        current = current[key]
     return current
 
-def safe_to_float(value: Any, default: float = 0.0) -> float:
-    """
-    Converts a value to float safely, handling None, infinity strings, and malformed types.
-    """
-    if value is None:
+
+def safe_cast(val: Any, to_type: Type[T], default: Optional[T] = None) -> Optional[T]:
+    """Convert a value to a target type with graceful fallback on edge-case failures."""
+    if val is None:
         return default
-    if isinstance(value, (int, float)):
-        if math.isnan(value) or math.isinf(value):
-            return default
-        return float(value)
+
     try:
-        cleaned = str(value).strip()
-        if cleaned.lower() in ('inf', '-inf', 'infinity', '-infinity', 'nan'):
-            return default
-        return float(cleaned)
-    except (ValueError, TypeError):
+        return to_type(val)
+    except (ValueError, TypeError, OverflowError):
         return default
+
+
+def safe_truncate(text: Any, max_len: int, suffix: str = "...") -> str:
+    """Truncate input to max length, handling non-string objects and invalid bounds."""
+    if text is None:
+        return ""
+
+    str_val = str(text) if not isinstance(text, str) else text
+
+    if max_len <= 0:
+        return ""
+
+    if len(str_val) <= max_len:
+        return str_val
+
+    if max_len <= len(suffix):
+        return str_val[:max_len]
+
+    return str_val[: max_len - len(suffix)] + suffix
