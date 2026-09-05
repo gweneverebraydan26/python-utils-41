@@ -1,46 +1,40 @@
-from typing import Any, List, Optional, Type, TypeVar
+import os
+import json
+from typing import Any, Dict, Optional
 
-T = TypeVar("T")
+def load_json(file_path: str) -> Dict[str, Any]:
+    """Load and parse a JSON file safely."""
+    if not os.path.exists(file_path):
+        return {}
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
+def save_json(data: Dict[str, Any], file_path: str) -> None:
+    """Serialize data to a JSON file with indentation."""
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4)
 
-def safe_get(target_dict: Any, keys: List[str], default: Optional[Any] = None) -> Any:
-    """Safely retrieve nested values from a dictionary without raising exceptions."""
-    if not isinstance(target_dict, dict):
-        return default
+def get_env_variable(key: str, default: Optional[str] = None) -> str:
+    """Retrieve environment variable with fallback."""
+    return os.getenv(key, default or "")
 
-    current = target_dict
-    for key in keys:
-        if not isinstance(current, dict) or key not in current:
-            return default
-        current = current[key]
-    return current
+def ensure_dir(directory: str) -> None:
+    """Create directory path if it does not exist."""
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
+def chunk_list(data: list, size: int):
+    """Split a list into smaller chunks."""
+    for i in range(0, len(data), size):
+        yield data[i:i + size]
 
-def safe_cast(val: Any, to_type: Type[T], default: Optional[T] = None) -> Optional[T]:
-    """Convert a value to a target type with graceful fallback on edge-case failures."""
-    if val is None:
-        return default
-
-    try:
-        return to_type(val)
-    except (ValueError, TypeError, OverflowError):
-        return default
-
-
-def safe_truncate(text: Any, max_len: int, suffix: str = "...") -> str:
-    """Truncate input to max length, handling non-string objects and invalid bounds."""
-    if text is None:
-        return ""
-
-    str_val = str(text) if not isinstance(text, str) else text
-
-    if max_len <= 0:
-        return ""
-
-    if len(str_val) <= max_len:
-        return str_val
-
-    if max_len <= len(suffix):
-        return str_val[:max_len]
-
-    return str_val[: max_len - len(suffix)] + suffix
+def flatten_dict(d: Dict, parent_key: str = '', sep: str = '_') -> Dict:
+    """Flatten nested dictionary structures."""
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
