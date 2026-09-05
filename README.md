@@ -1,47 +1,51 @@
 # python-utils-41
 
-A collection of reusable Python utilities designed to simplify common programming tasks and improve code efficiency. This project aims to provide a lightweight yet versatile set of tools that enhance productivity in Python development.
+A collection of lightweight, high-performance Python utilities designed to streamline repetitive development tasks. This library bridges common functional gaps in standard library workflows, focusing on performance and code readability.
 
 ## Features
 
-- **String Manipulation**: A robust set of functions for advanced string operations, including trimming, formatting, and validation.
-- **Data Serialization**: Easy-to-use functions for serializing and deserializing data into multiple formats like JSON and CSV.
-- **File Management**: Tools to streamline file operations, including reading, writing, and organizing directory structures.
-- **Error Handling**: A framework for consistent and informative error reporting, making debugging simpler and more efficient.
+*   **Robust File Operations:** Advanced wrappers for recursive file processing, bulk renaming, and structured directory scanning.
+*   **Dict-to-Object Mapper:** A zero-dependency utility to cast nested dictionaries into dot-notation accessible objects.
+*   **Performance Decorators:** Pre-built function wrappers for intelligent caching, execution timing, and retry logic with exponential backoff.
+*   **Type-Safe Converters:** Strict data transformers for complex JSON-to-CSV exports and environmental variable normalization.
 
 ## Installation
 
-To get started with `python-utils-41`, clone the repository and install the package using pip:
+Install `python-utils-41` directly via pip:
 
 ```bash
-git clone https://github.com/Developer/python-utils-41.git
-cd python-utils-41
-pip install .
+pip install python-utils-41
 ```
 
-## Basic Usage
+Or add it to your `requirements.txt`:
 
-Here’s a quick example of how to use the string manipulation utility included in this project:
+```text
+python-utils-41>=1.0.0
+```
+
+## Usage Example
+
+Import the core modules to simplify your daily workflow:
 
 ```python
-from utils import StringUtils
+from pyutils41 import Mapper, Timer
 
-# Initialize the utility
-str_util = StringUtils()
+# Map dictionaries to objects
+data = {"user": {"id": 41, "name": "Admin"}}
+user = Mapper.to_obj(data)
+print(user.user.name)  # Output: Admin
 
-# Use a string formatting function
-formatted_string = str_util.format_string("Hello, {name}!", name="World")
-print(formatted_string)  # Output: Hello, World!
+# Time your function execution
+@Timer.log
+def process_data():
+    return [i**2 for i in range(1000)]
 
-# Validate a string
-is_valid = str_util.validate_email("example@example.com")
-print(is_valid)  # Output: True
+process_data() 
+# Logs: 'process_data' finished in 0.00012s
 ```
 
 ## License
 
-![MIT License](https://img.shields.io/badge/license-MIT-green)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-`python-utils-41` is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
-
-For contributions and support, please refer to the contribution guidelines in the repository.
+Distributed under the MIT License. See `LICENSE` for more information.
