@@ -1,33 +1,34 @@
 import logging
-import sys
-from typing import Optional
+from logging.handlers import RotatingFileHandler
+import os
 
-def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
-    """Configures and returns a standardized application logger."""
+def setup_logger(name: str, log_file: str = 'app.log', level: int = logging.INFO) -> logging.Logger:
+    """Configures a rotating file logger."""
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
+    # Prevent duplicate handlers if logger is re-initialized
     if not logger.handlers:
-        handler = logging.StreamHandler(sys.stdout)
+        # 5MB per file, keep 3 backups
+        handler = RotatingFileHandler(
+            log_file, 
+            maxBytes=5 * 1024 * 1024, 
+            backupCount=3
+        )
+        
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
+        
+        # Optional: Add stream handler for console output
+        console = logging.StreamHandler()
+        console.setFormatter(formatter)
+        logger.addHandler(console)
 
     return logger
 
-class AppLogger:
-    """Wrapper class for centralized logging operations."""
-    def __init__(self, name: str):
-        self.logger = get_logger(name)
-
-    def info(self, msg: str) -> None:
-        self.logger.info(msg)
-
-    def error(self, msg: str, exc_info: bool = True) -> None:
-        self.logger.error(msg, exc_info=exc_info)
-
-    def debug(self, msg: str) -> None:
-        self.logger.debug(msg)
+if __name__ == '__main__':
+    log = setup_logger('utils_logger')
+    log.info('logger initialization successful')
