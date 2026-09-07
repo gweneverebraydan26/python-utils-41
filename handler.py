@@ -1,54 +1,35 @@
-import logging
-from typing import Any, Dict, List
+from typing import Dict, Any, Optional, Callable
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
+class DataHandler:
+    """Handles incoming data payloads for python-utils-41 processing."""
 
+    def __init__(self, callback: Optional[Callable[[Any], None]] = None) -> None:
+        self.callback = callback
+        self.storage: Dict[str, Any] = {}
 
-class ValidationError(Exception):
-    """Raised when a payload fails input validation rules."""
-    pass
+    def process_payload(self, key: str, value: Any) -> bool:
+        """Stores data and triggers optional callback."""
+        if not key or not isinstance(key, str):
+            return False
+        
+        self.storage[key] = value
+        if self.callback:
+            self.callback(value)
+        return True
 
+    def get_data(self, key: str) -> Optional[Any]:
+        """Retrieves value by key from internal storage."""
+        return self.storage.get(key)
 
-def validate_payload(payload: Dict[str, Any]) -> None:
-    """Validate payload structure and field types before processing."""
-    if not isinstance(payload, dict):
-        raise ValidationError("Payload must be a dictionary")
+    def clear_storage(self) -> None:
+        """Resets the current handler data storage."""
+        self.storage.clear()
 
-    required_fields = ["task_id", "action", "data"]
-    for field in required_fields:
-        if field not in payload:
-            raise ValidationError(f"Missing required field: '{field}'")
+def example_callback(data: Any) -> None:
+    """Example observer function for data changes."""
+    print(f"Processing: {data}")
 
-    if not isinstance(payload["task_id"], (str, int)):
-        raise ValidationError("Field 'task_id' must be a string or integer")
-
-    if not isinstance(payload["action"], str) or not payload["action"].strip():
-        raise ValidationError("Field 'action' must be a non-empty string")
-
-    if not isinstance(payload["data"], dict):
-        raise ValidationError("Field 'data' must be a dictionary")
-
-
-def process_task(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Execute processing logic for a valid task payload."""
-    logger.info(f"Processing task {payload['task_id']}: {payload['action']}")
-    return {"status": "success", "task_id": payload["task_id"]}
-
-
-def run_processing_loop(items: List[Any]) -> List[Dict[str, Any]]:
-    """Main processing loop with input validation for batch execution."""
-    results = []
-    for index, item in enumerate(items):
-        try:
-            validate_payload(item)
-            result = process_task(item)
-            results.append(result)
-        except ValidationError as err:
-            logger.warning(f"Validation failed for item at index {index}: {err}")
-            results.append({"status": "rejected", "index": index, "error": str(err)})
-        except Exception as err:
-            logger.error(f"Unexpected error processing item at index {index}: {err}")
-            results.append({"status": "error", "index": index, "error": "Internal failure"})
-
-    return results
+if __name__ == "__main__":
+    handler = DataHandler(callback=example_callback)
+    handler.process_payload("session_id", 1024)
+    print(f"Value retrieved: {handler.get_data('session_id')}")
