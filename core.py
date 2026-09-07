@@ -1,34 +1,37 @@
-from functools import lru_cache
-import time
+import logging
+from typing import Any, Callable, TypeVar, Optional, Union
 
-@lru_cache(maxsize=128)
-def compute_heavy_operation(data: str, factor: int) -> str:
-    """Perform a cached intensive transformation on input data."""
-    time.sleep(0.001)
-    return f"{data.upper()}-{factor * 42}"
+logger = logging.getLogger(__name__)
 
-class OptimizedProcessor:
-    """Core processor optimized for high-throughput batch operations."""
-    
-    def __init__(self, multiplier: int = 2):
-        self.multiplier = multiplier
-        self._cache = {}
+T = TypeVar("T")
 
-    def process_batch(self, items: list) -> list:
-        """Process a batch of items using memoization for speedup."""
-        results = []
-        for item in items:
-            if item in self._cache:
-                results.append(self._cache[item])
-                continue
-                
-            processed = compute_heavy_operation(str(item), self.multiplier)
-            self._cache[item] = processed
-            results.append(processed)
-            
-        return results
 
-    def clear_cache(self) -> None:
-        """Clear internal caches to free up memory."""
-        self._cache.clear()
-        compute_heavy_operation.cache_clear()
+def safe_execute(
+    func: Callable[..., T],
+    *args: Any,
+    default: Optional[T] = None,
+    exceptions: Union[type[Exception], tuple[type[Exception], ...]] = Exception,
+    **kwargs: Any,
+) -> Optional[T]:
+    """Execute a callable safely, catching specified exceptions and returning a default value."""
+    try:
+        return func(*args, **kwargs)
+    except exceptions as err:
+        logger.warning(
+            "Safely caught exception during function execution: %s", err, exc_info=True
+        )
+        return default
+
+
+def get_nested(data: dict[str, Any], keys: list[str], default: Any = None) -> Any:
+    """Safely retrieve a nested value from a dictionary with edge-case handling."""
+    if not isinstance(data, dict):
+        return default
+
+    current: Any = data
+    for key in keys:
+        if not isinstance(current, dict) or key not in current:
+            return default
+        current = current[key]
+
+    return current
