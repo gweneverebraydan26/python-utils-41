@@ -1,35 +1,31 @@
-from typing import Dict, Any, Optional, Callable
+import logging
+from typing import Any, Callable, Optional
 
-class DataHandler:
-    """Handles incoming data payloads for python-utils-41 processing."""
+logger = logging.getLogger(__name__)
 
-    def __init__(self, callback: Optional[Callable[[Any], None]] = None) -> None:
-        self.callback = callback
-        self.storage: Dict[str, Any] = {}
+def safe_execute(func: Callable, *args: Any, **kwargs: Any) -> Optional[Any]:
+    """Executes a callable with robust error handling for edge cases."""
+    try:
+        return func(*args, **kwargs)
+    except TypeError as e:
+        logger.error(f"Type mismatch in {func.__name__}: {e}")
+    except ValueError as e:
+        logger.error(f"Invalid value provided to {func.__name__}: {e}")
+    except KeyError as e:
+        logger.error(f"Missing required key in {func.__name__}: {e}")
+    except AttributeError as e:
+        logger.error(f"Object missing expected attribute in {func.__name__}: {e}")
+    except Exception as e:
+        logger.critical(f"Unexpected system error in {func.__name__}: {e}", exc_info=True)
+    return None
 
-    def process_payload(self, key: str, value: Any) -> bool:
-        """Stores data and triggers optional callback."""
-        if not key or not isinstance(key, str):
+def validate_input(data: Any, expected_type: type) -> bool:
+    """Checks if data exists and matches expected type."""
+    try:
+        if data is None:
             return False
-        
-        self.storage[key] = value
-        if self.callback:
-            self.callback(value)
+        if not isinstance(data, expected_type):
+            return False
         return True
-
-    def get_data(self, key: str) -> Optional[Any]:
-        """Retrieves value by key from internal storage."""
-        return self.storage.get(key)
-
-    def clear_storage(self) -> None:
-        """Resets the current handler data storage."""
-        self.storage.clear()
-
-def example_callback(data: Any) -> None:
-    """Example observer function for data changes."""
-    print(f"Processing: {data}")
-
-if __name__ == "__main__":
-    handler = DataHandler(callback=example_callback)
-    handler.process_payload("session_id", 1024)
-    print(f"Value retrieved: {handler.get_data('session_id')}")
+    except Exception:
+        return False
