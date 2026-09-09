@@ -1,32 +1,28 @@
-import time
-import functools
-import logging
+import json
+from typing import Any, Dict, Optional
 
-logger = logging.getLogger(__name__)
+def deep_get(data: Dict[str, Any], path: str, default: Any = None) -> Any:
+    """Retrieve nested dictionary value using dot-notation path."""
+    keys = path.split('.')
+    current = data
+    try:
+        for key in keys:
+            current = current[key]
+        return current
+    except (KeyError, TypeError):
+        return default
 
-def retry_network_op(retries=3, delay=1, backoff=2, exceptions=(Exception,)):
-    """Decorator for retrying network operations with exponential backoff."""
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            current_delay = delay
-            for attempt in range(retries):
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    if attempt == retries - 1:
-                        logger.error(f"Failed after {retries} attempts: {e}")
-                        raise
-                    
-                    logger.warning(f"Attempt {attempt + 1} failed, retrying in {current_delay}s...")
-                    time.sleep(current_delay)
-                    current_delay *= backoff
-            return None
-        return wrapper
-    return decorator
+def serialize_json(data: Any, indent: int = 4) -> str:
+    """Convert python object to formatted json string."""
+    try:
+        return json.dumps(data, indent=indent, sort_keys=True)
+    except (TypeError, ValueError) as e:
+        return str(e)
 
-@retry_network_op(retries=3, delay=2)
-def fetch_data(url):
-    """Example network call placeholder."""
-    # Actual network implementation would go here
-    raise ConnectionError("Service unavailable")
+def sanitize_keys(data: Dict[str, Any], prefix: str = 'clean_') -> Dict[str, Any]:
+    """Prefix all dictionary keys for consistent output."""
+    return {f"{prefix}{k}": v for k, v in data.items()}
+
+def validate_schema(data: Dict[str, Any], required_keys: list) -> bool:
+    """Check if all required keys exist in dictionary."""
+    return all(key in data for key in required_keys)
