@@ -1,34 +1,29 @@
-import time
-import functools
-import logging
+from typing import Any, Dict, Generator, List
 
-logger = logging.getLogger(__name__)
+def deep_merge(dict_a: Dict[str, Any], dict_b: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively merges two dictionaries, with dict_b taking precedence."""
+    result = dict_a.copy()
+    for key, value in dict_b.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
 
-def retry(max_attempts=3, delay=1, backoff=2, exceptions=(Exception,)):
-    """Decorator to retry network operations with exponential backoff."""
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            current_delay = delay
-            for attempt in range(1, max_attempts + 1):
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    if attempt == max_attempts:
-                        logger.error(f"Final attempt {attempt} failed for {func.__name__}")
-                        raise e
-                    
-                    logger.warning(f"Attempt {attempt} failed: {e}. Retrying in {current_delay}s...")
-                    time.sleep(current_delay)
-                    current_delay *= backoff
-        return wrapper
-    return decorator
+def chunk_iterable(items: List[Any], size: int) -> Generator[List[Any], None, None]:
+    """Yields successive chunks of a specified size from the input list."""
+    if size <= 0:
+        raise ValueError("Chunk size must be greater than zero.")
+    for i in range(0, len(items), size):
+        yield items[i : i + size]
 
-@retry(max_attempts=3, delay=2)
-def network_request_stub(url):
-    """Example network operation function."""
-    # Simulating volatile network conditions
-    import random
-    if random.random() < 0.7:
-        raise ConnectionError("Transient network error")
-    return f"Success fetching {url}"
+def flatten_dict(d: Dict[str, Any], parent_key: str = '', sep: str = '_') -> Dict[str, Any]:
+    """Flattens a nested dictionary, joining keys with a separator."""
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
