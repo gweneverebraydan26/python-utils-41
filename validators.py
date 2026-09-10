@@ -1,38 +1,56 @@
-import logging
+import re
 from typing import Any, Optional
 
-logger = logging.getLogger(__name__)
+# Standard regex patterns for validation
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
+IP_REGEX = re.compile(
+    r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+)
 
-def validate_input_data(data: Any) -> bool:
-    """Validates dictionary structure for the processing loop."""
-    if not isinstance(data, dict):
-        logger.error("Invalid input type: expected dictionary")
+
+def is_valid_email(email: Any) -> bool:
+    """Validate whether the given input is a valid email address structure.
+
+    Args:
+        email: The input string or value to validate.
+
+    Returns:
+        True if the input is a string and matches the email pattern, False otherwise.
+    """
+    if not isinstance(email, str):
         return False
+    return bool(EMAIL_REGEX.match(email))
 
-    required_keys = {'id', 'payload', 'timestamp'}
-    if not required_keys.issubset(data.keys()):
-        missing = required_keys - data.keys()
-        logger.error(f"Missing required keys: {missing}")
+
+def is_valid_ip(ip_address: Any) -> bool:
+    """Check if the provided input is a valid IPv4 address.
+
+    Args:
+        ip_address: The input string or value to validate.
+
+    Returns:
+        True if the input is a valid IPv4 address string, False otherwise.
+    """
+    if not isinstance(ip_address, str):
         return False
+    return bool(IP_REGEX.match(ip_address))
 
-    if not isinstance(data['id'], int):
-        logger.error("Input validation error: 'id' must be an integer")
+
+def validate_range(
+    value: float, min_val: Optional[float] = None, max_val: Optional[float] = None
+) -> bool:
+    """Verify if a numeric value falls within an optionally specified range.
+
+    Args:
+        value: The number to check.
+        min_val: The optional lower bound (inclusive).
+        max_val: The optional upper bound (inclusive).
+
+    Returns:
+        True if the value is within bounds, False otherwise.
+    """
+    if min_val is not None and value < min_val:
         return False
-
+    if max_val is not None and value > max_val:
+        return False
     return True
-
-def process_main_loop(items: list[Any]) -> list[Any]:
-    """Main loop with integrated input validation."""
-    processed_results = []
-    for item in items:
-        if validate_input_data(item):
-            try:
-                # Core processing logic logic
-                result = f"processed_{item['id']}"
-                processed_results.append(result)
-            except Exception as e:
-                logger.warning(f"Processing failed for item {item.get('id')}: {e}")
-        else:
-            logger.debug("Skipping malformed input entry")
-    
-    return processed_results
