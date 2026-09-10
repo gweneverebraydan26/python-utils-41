@@ -1,32 +1,34 @@
-import functools
 import time
-from typing import Callable, Any, Dict
+import functools
+import logging
 
-# Cache dictionary to store function results
-_CACHE: Dict[str, Any] = {}
+logger = logging.getLogger(__name__)
 
-def memoize(func: Callable) -> Callable:
-    """Performance optimization for expensive function calls."""
-    @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        key = f"{func.__name__}:{args}:{frozenset(kwargs.items())}"
-        if key not in _CACHE:
-            _CACHE[key] = func(*args, **kwargs)
-        return _CACHE[key]
-    return wrapper
+def retry(max_attempts=3, delay=1, backoff=2, exceptions=(Exception,)):
+    """Decorator to retry network operations with exponential backoff."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            current_delay = delay
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    if attempt == max_attempts:
+                        logger.error(f"Final attempt {attempt} failed for {func.__name__}")
+                        raise e
+                    
+                    logger.warning(f"Attempt {attempt} failed: {e}. Retrying in {current_delay}s...")
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+        return wrapper
+    return decorator
 
-def batch_process(items: list, chunk_size: int = 100):
-    """Generator for memory-efficient batch processing of lists."""
-    for i in range(0, len(items), chunk_size):
-        yield items[i:i + chunk_size]
-
-def timed_execution(func: Callable) -> Callable:
-    """Decorator to log execution time for performance profiling."""
-    @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        start_time = time.perf_counter()
-        result = func(*args, **kwargs)
-        end_time = time.perf_counter()
-        print(f"{func.__name__} executed in {end_time - start_time:.4f}s")
-        return result
-    return wrapper
+@retry(max_attempts=3, delay=2)
+def network_request_stub(url):
+    """Example network operation function."""
+    # Simulating volatile network conditions
+    import random
+    if random.random() < 0.7:
+        raise ConnectionError("Transient network error")
+    return f"Success fetching {url}"
