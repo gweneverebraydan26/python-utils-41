@@ -1,39 +1,39 @@
+import time
+import functools
 import logging
 
 logger = logging.getLogger(__name__)
 
+def retry_operation(max_retries=3, delay=1.0, backoff=2.0, exceptions=(Exception,)):
+    """Decorator to retry network operations with exponential backoff."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            current_delay = delay
+            last_exception = None
 
-def validate_input_item(item):
-    """Validate that the input item is a non-empty dictionary with required keys."""
-    if not isinstance(item, dict):
-        raise TypeError(f"Expected dict, got {type(item).__name__}")
-    
-    if "id" not in item or "value" not in item:
-        raise ValueError("Item is missing required keys: 'id' or 'value'")
-    
-    if not isinstance(item["id"], (int, str)):
-        raise TypeError("Item 'id' must be an integer or string")
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    last_exception = e
+                    if attempt == max_retries:
+                        break
+                    
+                    logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {current_delay}s...")
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+            
+            logger.error(f"Operation failed after {max_retries} retries.")
+            raise last_exception
+        return wrapper
+    return decorator
 
-    return True
-
-
-def process_items(input_data):
-    """Main processing loop with input validation for python-utils-41."""
-    results = []
-    
-    if not isinstance(input_data, list):
-        logger.error("Processing failed: input must be a list")
-        raise TypeError("Input data must be a list of items")
-
-    for index, item in enumerate(input_data):
-        try:
-            validate_input_item(item)
-            # Simulate processing valid item
-            processed_value = item["value"]
-            results.append({"id": item["id"], "processed": processed_value})
-            logger.debug(f"Successfully processed item index {index}")
-        except (TypeError, ValueError) as e:
-            logger.warning(f"Skipping invalid item at index {index}: {e}")
-            continue
-
-    return results
+@retry_operation(max_retries=3, delay=2.0)
+def fetch_network_data(url):
+    """Example function performing network I/O."""
+    # Simulating actual network logic
+    import random
+    if random.random() < 0.7:
+        raise ConnectionError("Temporary server timeout")
+    return {"status": "success", "url": url}
