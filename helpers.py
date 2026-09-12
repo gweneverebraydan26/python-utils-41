@@ -1,25 +1,42 @@
-import json
-import os
-from typing import Any, Dict
+import functools
+import logging
+import random
+import time
 
-def load_config(file_path: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
-    """Loads configuration from a JSON file with provided defaults."""
-    config = defaults.copy()
-    
-    if not os.path.exists(file_path):
-        return config
-        
-    try:
-        with open(file_path, 'r') as f:
-            user_config = json.load(f)
-            if isinstance(user_config, dict):
-                config.update(user_config)
-    except (json.JSONDecodeError, IOError):
-        pass
-        
-    return config
+logger = logging.getLogger("python-utils.helpers")
 
-def save_config(file_path: str, config: Dict[str, Any]) -> None:
-    """Saves configuration dictionary to a JSON file."""
-    with open(file_path, 'w') as f:
-        json.dump(config, f, indent=4)
+
+def retry_on_failure(
+    exceptions=(Exception,),
+    tries=3,
+    delay=1.0,
+    backoff=2.0,
+    jitter=True,
+):
+    """Decorator for retrying functions with exponential backoff and jitter.
+
+    Particularly useful for handling transient network failures gracefully.
+    """
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            mtries, mdelay = tries, delay
+            while mtries > 1:
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    logger.warning(
+                        f"Failed with {e.__class__.__name__}: {e}. Retrying in {mdelay:.2f}s..."
+                    )
+                    time.sleep(mdelay)
+                    mtries -= 1
+                    mdelay *= backoff
+                    if jitter:
+                        # Apply randomized jitter of +/- 50% of backoff
+                        mdelay *= random.uniform(0.5, 1.5)
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
