@@ -1,31 +1,43 @@
-import logging
-from typing import Any, Callable, Optional
+import time
+import urllib.error
+import urllib.request
+from typing import Callable, Any, Optional
 
-logger = logging.getLogger(__name__)
-
-def safe_execute(func: Callable, *args: Any, **kwargs: Any) -> Optional[Any]:
-    """Executes a callable with robust error handling for edge cases."""
-    try:
-        return func(*args, **kwargs)
-    except TypeError as e:
-        logger.error(f"Type mismatch in {func.__name__}: {e}")
-    except ValueError as e:
-        logger.error(f"Invalid value provided to {func.__name__}: {e}")
-    except KeyError as e:
-        logger.error(f"Missing required key in {func.__name__}: {e}")
-    except AttributeError as e:
-        logger.error(f"Object missing expected attribute in {func.__name__}: {e}")
-    except Exception as e:
-        logger.critical(f"Unexpected system error in {func.__name__}: {e}", exc_info=True)
+def fetch_with_retry(
+    url: str,
+    max_retries: int = 3,
+    backoff_factor: float = 1.0,
+    timeout: float = 5.0
+) -> Optional[bytes]:
+    """
+    Fetch content from a URL with exponential backoff retry logic.
+    """
+    attempt = 0
+    while attempt < max_retries:
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'python-utils/1.0'})
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                return response.read()
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            attempt += 1
+            if attempt >= max_retries:
+                raise RuntimeError(f"Failed to fetch {url} after {max_retries} attempts") from e
+            sleep_time = backoff_factor * (2 ** (attempt - 1))
+            time.sleep(sleep_time)
     return None
 
-def validate_input(data: Any, expected_type: type) -> bool:
-    """Checks if data exists and matches expected type."""
-    try:
-        if data is None:
-            return False
-        if not isinstance(data, expected_type):
-            return False
-        return True
-    except Exception:
-        return False
+def retry_operation(func: Callable[..., Any], max_retries: int = 3, backoff_factor: float = 1.0) -> Callable[..., Any]:
+    """
+    Decorator to retry any network operation upon failure.
+    """
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        attempt = 0
+        while attempt < max_retries:
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                attempt += 1
+                if attempt >= max_retries:
+                    raise e
+                time.sleep(backoff_factor * (2 ** (attempt - 1)))
+    return wrapper
