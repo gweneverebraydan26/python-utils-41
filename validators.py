@@ -1,36 +1,33 @@
+import json
 import re
 
-def validate_input_data(data: dict) -> bool:
-    """
-    Validates core dictionary structure and value types.
-    Returns True if valid, raises ValueError otherwise.
-    """
-    required_keys = {'id', 'payload', 'timestamp'}
-    
-    # Check for missing keys
-    if not all(key in data for key in required_keys):
-        raise ValueError(f"Missing required keys: {required_keys - data.keys()}")
-    
-    # Validate ID format (alphanumeric string)
-    if not isinstance(data['id'], str) or not re.match(r'^[a-zA-Z0-9_-]+$', data['id']):
-        raise ValueError("Invalid ID format: must be alphanumeric string")
-        
-    # Validate payload length constraints
-    if not isinstance(data['payload'], (str, list)) or len(str(data['payload'])) > 1024:
-        raise ValueError("Payload exceeds size limits or invalid type")
-        
-    return True
+# Regular expressions for basic email and phone validation
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+PHONE_REGEX = re.compile(r"^\+?[1-9]\d{1,14}$")  # E.164 format
 
-def process_main_loop(items: list):
-    """
-    Example integration loop for data processing.
-    """
-    results = []
-    for item in items:
-        try:
-            if validate_input_data(item):
-                # Process logic here
-                results.append(item['id'])
-        except ValueError as e:
-            print(f"Validation skipped item: {e}")
-    return results
+
+def is_valid_email(email: str) -> bool:
+    """Check if the provided string is a valid email address."""
+    if not isinstance(email, str):
+        return False
+    return bool(EMAIL_REGEX.match(email))
+
+
+def is_valid_phone(phone: str) -> bool:
+    """Check if the provided string is a valid E.164 phone number."""
+    if not isinstance(phone, str):
+        return False
+    # Strip spaces and dashes for checking
+    cleaned = phone.replace(" ", "").replace("-", "")
+    return bool(PHONE_REGEX.match(cleaned))
+
+
+def is_valid_json(json_str: str) -> bool:
+    """Verify if a string is a valid JSON document."""
+    if not isinstance(json_str, str):
+        return False
+    try:
+        json.loads(json_str)
+        return True
+    except (ValueError, TypeError):
+        return False
