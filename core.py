@@ -1,13 +1,23 @@
-from typing import Any, Dict
+import time
+from typing import Any, Dict, Generator, Iterable, List
+from contextlib import contextmanager
 
-def get_nested(data: Dict[str, Any], path: str, default: Any = None, separator: str = ".") -> Any:
-    """
-    Retrieve a value from a nested dictionary using a separator-delimited path.
-    """
-    if not path:
-        return data
-    
-    keys = path.split(separator)
+def chunk_iterable(iterable: Iterable[Any], size: int) -> Generator[List[Any], None, None]:
+    """Yield successive n-sized chunks from an iterable."""
+    if size <= 0:
+        raise ValueError("Chunk size must be greater than zero.")
+    chunk = []
+    for item in iterable:
+        chunk.append(item)
+        if len(chunk) == size:
+            yield chunk
+            chunk = []
+    if chunk:
+        yield chunk
+
+def safe_get(data: Dict[str, Any], path: str, default: Any = None) -> Any:
+    """Retrieve a nested value from a dictionary using a dot-separated path."""
+    keys = path.split(".")
     current = data
     for key in keys:
         if isinstance(current, dict) and key in current:
@@ -16,19 +26,11 @@ def get_nested(data: Dict[str, Any], path: str, default: Any = None, separator: 
             return default
     return current
 
-def set_nested(data: Dict[str, Any], path: str, value: Any, separator: str = ".") -> None:
-    """
-    Set a value in a nested dictionary using a separator-delimited path,
-    creating intermediate dictionaries if they do not exist.
-    """
-    if not path:
-        return
-    
-    keys = path.split(separator)
-    current = data
-    for key in keys[:-1]:
-        if key not in current or not isinstance(current[key], dict):
-            current[key] = {}
-        current = current[key]
-    
-    current[keys[-1]] = value
+@contextmanager
+def execution_timer() -> Generator[Dict[str, float], None, None]:
+    """Context manager to measure the execution time of a code block."""
+    stats = {"start": time.perf_counter(), "elapsed": 0.0}
+    try:
+        yield stats
+    finally:
+        stats["elapsed"] = time.perf_counter() - stats["start"]
