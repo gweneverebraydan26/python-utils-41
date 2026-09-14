@@ -1,26 +1,14 @@
 import logging
-from logging.handlers import RotatingFileHandler
-import os
+import sys
+from typing import Optional
 
-def setup_logger(name: str, log_file: str, level: int = logging.INFO) -> logging.Logger:
-    """Configures a rotating file logger for the application."""
+def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
+    """Initializes and returns a configured logger instance."""
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    # Prevent duplicate handlers if logger is re-initialized
     if not logger.handlers:
-        # Ensure log directory exists
-        log_dir = os.path.dirname(log_file)
-        if log_dir and not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-
-        # Rotation setup: 5MB per file, keep 3 backups
-        handler = RotatingFileHandler(
-            log_file, 
-            maxBytes=5 * 1024 * 1024, 
-            backupCount=3
-        )
-        
+        handler = logging.StreamHandler(sys.stdout)
         formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
@@ -29,5 +17,14 @@ def setup_logger(name: str, log_file: str, level: int = logging.INFO) -> logging
 
     return logger
 
-# Default instance for quick access
-app_logger = setup_logger('app', 'logs/app.log')
+def log_exception(logger: logging.Logger, msg: str, exc: Exception) -> None:
+    """Logs an exception with a custom message and stack trace."""
+    logger.error(f"{msg}: {str(exc)}", exc_info=True)
+
+def setup_basic_logging(level: int = logging.INFO) -> None:
+    """Configures the root logger for standard output."""
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        handlers=[logging.StreamHandler(sys.stdout)]
+    )
