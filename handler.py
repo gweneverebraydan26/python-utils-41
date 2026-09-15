@@ -1,43 +1,49 @@
-import time
-import urllib.error
-import urllib.request
-from typing import Callable, Any, Optional
+import logging
+from typing import Any, Dict, List, Tuple
 
-def fetch_with_retry(
-    url: str,
-    max_retries: int = 3,
-    backoff_factor: float = 1.0,
-    timeout: float = 5.0
-) -> Optional[bytes]:
-    """
-    Fetch content from a URL with exponential backoff retry logic.
-    """
-    attempt = 0
-    while attempt < max_retries:
-        try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'python-utils/1.0'})
-            with urllib.request.urlopen(req, timeout=timeout) as response:
-                return response.read()
-        except (urllib.error.URLError, TimeoutError, OSError) as e:
-            attempt += 1
-            if attempt >= max_retries:
-                raise RuntimeError(f"Failed to fetch {url} after {max_retries} attempts") from e
-            sleep_time = backoff_factor * (2 ** (attempt - 1))
-            time.sleep(sleep_time)
-    return None
+logger = logging.getLogger(__name__)
 
-def retry_operation(func: Callable[..., Any], max_retries: int = 3, backoff_factor: float = 1.0) -> Callable[..., Any]:
-    """
-    Decorator to retry any network operation upon failure.
-    """
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        attempt = 0
-        while attempt < max_retries:
+
+class ValidationError(Exception):
+    """Raised when input item validation fails."""
+    pass
+
+
+class ItemHandler:
+    """Handles validation and processing of batch input records."""
+
+    def __init__(self, required_fields: List[str]):
+        self.required_fields = required_fields
+
+    def validate_item(self, item: Any) -> Dict[str, Any]:
+        """Validate a single input record structure and contents."""
+        if not isinstance(item, dict):
+            raise ValidationError(f"Expected dict, got {type(item).__name__}")
+
+        for field in self.required_fields:
+            if field not in item or item[field] is None:
+                raise ValidationError(f"Missing required field: '{field}'")
+
+        if "id" in item and not isinstance(item["id"], (int, str)):
+            raise ValidationError("Field 'id' must be an integer or string")
+
+        return item
+
+    def process_loop(
+        self, raw_data: List[Any]
+    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Main processing loop with per-item input validation."""
+        successful: List[Dict[str, Any]] = []
+        failed: List[Dict[str, Any]] = []
+
+        for index, raw_item in enumerate(raw_data):
             try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                attempt += 1
-                if attempt >= max_retries:
-                    raise e
-                time.sleep(backoff_factor * (2 ** (attempt - 1)))
-    return wrapper
+                valid_item = self.validate_item(raw_item)
+                # Perform processing on validated item
+                valid_item["status"] = "processed"
+                successful.append(valid_item)
+            except ValidationError as err:
+                logger.warning("Validation failed at index %d: %s", index, err)
+                failed.append({"index": index, "raw": raw_item, "error": str(err)})
+
+        return successful, failed
