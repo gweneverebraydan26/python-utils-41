@@ -1,33 +1,30 @@
-import json
-import re
+from typing import Any, Optional, Union
 
-# Regular expressions for basic email and phone validation
-EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
-PHONE_REGEX = re.compile(r"^\+?[1-9]\d{1,14}$")  # E.164 format
-
-
-def is_valid_email(email: str) -> bool:
-    """Check if the provided string is a valid email address."""
-    if not isinstance(email, str):
+def validate_email(email: str) -> bool:
+    """Validate email string format using basic presence checks."""
+    if not isinstance(email, str) or "@" not in email:
         return False
-    return bool(EMAIL_REGEX.match(email))
+    return len(email.split("@")[1].split(".")) > 1
 
+def validate_range(value: Union[int, float], min_val: float, max_val: float) -> bool:
+    """Check if numeric value is within specified bounds."""
+    return min_val <= value <= max_val
 
-def is_valid_phone(phone: str) -> bool:
-    """Check if the provided string is a valid E.164 phone number."""
-    if not isinstance(phone, str):
+def sanitize_string(value: Any, default: str = "") -> str:
+    """Ensure output is a string, returning default if input is None."""
+    if value is None:
+        return default
+    return str(value).strip()
+
+def is_not_empty(data: Optional[Union[str, list, dict]]) -> bool:
+    """Verify that the provided structure is not null or empty."""
+    if data is None:
         return False
-    # Strip spaces and dashes for checking
-    cleaned = phone.replace(" ", "").replace("-", "")
-    return bool(PHONE_REGEX.match(cleaned))
+    return bool(data)
 
-
-def is_valid_json(json_str: str) -> bool:
-    """Verify if a string is a valid JSON document."""
-    if not isinstance(json_str, str):
-        return False
-    try:
-        json.loads(json_str)
-        return True
-    except (ValueError, TypeError):
-        return False
+if __name__ == "__main__":
+    # Example usage for verification
+    assert validate_email("test@example.com") is True
+    assert validate_range(50, 0, 100) is True
+    assert sanitize_string(None) == ""
+    assert is_not_empty([1, 2, 3]) is True
