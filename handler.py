@@ -1,49 +1,36 @@
-import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Optional, Callable
 
-logger = logging.getLogger(__name__)
+class DataHandler:
+    """Handles incoming data payloads with configurable processors."""
 
+    def __init__(self, default_strategy: Optional[Callable[[Any], Any]] = None) -> None:
+        self._strategy = default_strategy or (lambda x: x)
 
-class ValidationError(Exception):
-    """Raised when input item validation fails."""
-    pass
+    def process(self, data: Dict[str, Any], key: str) -> Any:
+        """
+        Extracts value by key and applies processing strategy.
+        
+        Args:
+            data: Dictionary containing source information.
+            key: Target key to retrieve.
+            
+        Returns:
+            The processed value associated with the key.
+        """
+        raw_value = data.get(key)
+        if raw_value is None:
+            raise ValueError(f"Missing required key: {key}")
+        return self._strategy(raw_value)
 
-
-class ItemHandler:
-    """Handles validation and processing of batch input records."""
-
-    def __init__(self, required_fields: List[str]):
-        self.required_fields = required_fields
-
-    def validate_item(self, item: Any) -> Dict[str, Any]:
-        """Validate a single input record structure and contents."""
-        if not isinstance(item, dict):
-            raise ValidationError(f"Expected dict, got {type(item).__name__}")
-
-        for field in self.required_fields:
-            if field not in item or item[field] is None:
-                raise ValidationError(f"Missing required field: '{field}'")
-
-        if "id" in item and not isinstance(item["id"], (int, str)):
-            raise ValidationError("Field 'id' must be an integer or string")
-
-        return item
-
-    def process_loop(
-        self, raw_data: List[Any]
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Main processing loop with per-item input validation."""
-        successful: List[Dict[str, Any]] = []
-        failed: List[Dict[str, Any]] = []
-
-        for index, raw_item in enumerate(raw_data):
-            try:
-                valid_item = self.validate_item(raw_item)
-                # Perform processing on validated item
-                valid_item["status"] = "processed"
-                successful.append(valid_item)
-            except ValidationError as err:
-                logger.warning("Validation failed at index %d: %s", index, err)
-                failed.append({"index": index, "raw": raw_item, "error": str(err)})
-
-        return successful, failed
+    def batch_process(self, items: list[Dict[str, Any]], key: str) -> list[Any]:
+        """
+        Processes a list of dictionaries for a specific key.
+        
+        Args:
+            items: List of data dictionaries.
+            key: Target key for each dictionary.
+            
+        Returns:
+            List of processed values.
+        """
+        return [self.process(item, key) for item in items]
