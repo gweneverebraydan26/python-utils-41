@@ -1,53 +1,28 @@
-import time
-import random
+from typing import Final, Dict, Any
 
-# Constants for retry logic
-MAX_RETRIES = 5
-INITIAL_DELAY_SECONDS = 1
-BACKOFF_FACTOR = 2
-MAX_DELAY_SECONDS = 60
+# Standardized mapping for common data normalization tasks
+DEFAULT_ENCODING: Final[str] = 'utf-8'
+CHUNK_SIZE: Final[int] = 8192
 
-# Tuple of exceptions to retry on for network operations
-RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError, OSError)
+# Supported types for validation and casting
+TYPE_MAPPINGS: Final[Dict[str, Any]] = {
+    'int': int,
+    'float': float,
+    'str': str,
+    'bool': bool
+}
 
-def _calculate_delay(attempt, initial_delay=INITIAL_DELAY_SECONDS, backoff=BACKOFF_FACTOR, max_delay=MAX_DELAY_SECONDS):
-    """Calculate delay using exponential backoff with jitter."""
-    delay = initial_delay * (backoff ** attempt)
-    if delay > max_delay:
-        delay = max_delay
-    # Add jitter to prevent thundering herd
-    jitter = random.uniform(0, 0.5 * delay)
-    return delay + jitter
+# Error message templates for uniform logging
+ERROR_MSG_INVALID_INPUT: Final[str] = "invalid input data format: {msg}"
+ERROR_MSG_MISSING_KEY: Final[str] = "missing mandatory key: {key}"
 
-def retry_operation(func, *args, max_retries=MAX_RETRIES, exceptions=RETRYABLE_EXCEPTIONS, **kwargs):
-    """Retry the given function on network related errors.
-    Uses exponential backoff with jitter between attempts.
-    """
-    last_exception = None
-    for attempt in range(max_retries):
-        try:
-            return func(*args, **kwargs)
-        except exceptions as exc:
-            last_exception = exc
-            if attempt == max_retries - 1:
-                break
-            delay = _calculate_delay(attempt)
-            time.sleep(delay)
-        except Exception as exc:
-            # Non-retryable error, raise immediately
-            raise exc
-    # If we get here, all retries failed
-    if last_exception:
-        raise last_exception
-    raise RuntimeError("Operation failed after retries")
+# Environment status flags
+DEBUG_MODE_DEFAULT: Final[bool] = False
+MAX_RETRY_ATTEMPTS: Final[int] = 3
 
-# Sample network operation simulator for demonstration
-def example_network_call(data):
-    """Example of a network operation that might fail randomly."""
-    if random.random() > 0.7:  # 30% chance of success for demo
-        return f"Processed {data}"
-    else:
-        raise ConnectionError("Simulated network timeout")
+def get_type_caster(type_name: str):
+    """Retrieve caster function based on string name."""
+    return TYPE_MAPPINGS.get(type_name, str)
 
-# In production, use with real network functions e.g. http requests
-# To test: result = retry_operation(example_network_call, "sample")
+# Reserved keywords for system data operations
+RESERVED_KEYS: Final[list] = ['id', 'created_at', 'updated_at', 'meta']
