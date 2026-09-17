@@ -1,28 +1,34 @@
-import time
-import functools
-import logging
-from typing import Callable, Any, Type
+class ValidationError(Exception):
+    """Base exception for data validation failures."""
+    pass
 
-logger = logging.getLogger(__name__)
+def validate_input(data, schema):
+    """
+    Validates dictionary input against expected keys and types.
+    Ensures the data integrity before processing loop.
+    """
+    if not isinstance(data, dict):
+        raise ValidationError("Input must be a dictionary")
+    
+    for key, expected_type in schema.items():
+        if key not in data:
+            raise ValidationError(f"Missing required key: {key}")
+        if not isinstance(data[key], expected_type):
+            raise ValidationError(
+                f"Invalid type for {key}: expected {expected_type.__name__}, "
+                f"got {type(data[key]).__name__}"
+            )
+    return True
 
-def retry_on_network_failure(retries: int = 3, delay: float = 1.0, exceptions: tuple = (ConnectionError, TimeoutError)) -> Callable:
-    """Decorator to retry network-related functions with exponential backoff."""
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            attempt = 0
-            current_delay = delay
-            while attempt < retries:
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    attempt += 1
-                    if attempt == retries:
-                        logger.error(f"Final attempt failed for {func.__name__}: {e}")
-                        raise
-                    
-                    logger.warning(f"Attempt {attempt} failed for {func.__name__}, retrying in {current_delay}s...")
-                    time.sleep(current_delay)
-                    current_delay *= 2
-        return wrapper
-    return decorator
+def process_stream(items, schema):
+    """
+    Main processing loop with integrated input validation.
+    """
+    for index, item in enumerate(items):
+        try:
+            validate_input(item, schema)
+            # Process item logic here
+            print(f"Processing item {index}: {item}")
+        except ValidationError as e:
+            print(f"Skipping item {index} due to validation error: {e}")
+            continue
