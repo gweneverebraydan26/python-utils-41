@@ -1,30 +1,35 @@
-from typing import Any, Optional, Union
+import re
+from typing import Any, Optional
 
-def validate_email(email: str) -> bool:
-    """Validate email string format using basic presence checks."""
-    if not isinstance(email, str) or "@" not in email:
+def validate_input(data: Any, expected_type: type, pattern: Optional[str] = None) -> bool:
+    """Validates input type and optional regex pattern."""
+    if not isinstance(data, expected_type):
         return False
-    return len(email.split("@")[1].split(".")) > 1
+    
+    if pattern and isinstance(data, str):
+        return bool(re.match(pattern, data))
+    
+    return True
 
-def validate_range(value: Union[int, float], min_val: float, max_val: float) -> bool:
-    """Check if numeric value is within specified bounds."""
-    return min_val <= value <= max_val
-
-def sanitize_string(value: Any, default: str = "") -> str:
-    """Ensure output is a string, returning default if input is None."""
-    if value is None:
-        return default
-    return str(value).strip()
-
-def is_not_empty(data: Optional[Union[str, list, dict]]) -> bool:
-    """Verify that the provided structure is not null or empty."""
-    if data is None:
-        return False
-    return bool(data)
+def process_with_validation(data_list: list) -> list:
+    """
+    Main processing loop with input sanitization.
+    Expects strings starting with 'ID-'.
+    """
+    validated_data = []
+    pattern = r'^ID-\d{4,8}$'
+    
+    for item in data_list:
+        # Validate type and format
+        if validate_input(item, str, pattern):
+            validated_data.append(item.strip())
+        else:
+            # Log invalid input (omitted for brevity)
+            continue
+            
+    return validated_data
 
 if __name__ == "__main__":
-    # Example usage for verification
-    assert validate_email("test@example.com") is True
-    assert validate_range(50, 0, 100) is True
-    assert sanitize_string(None) == ""
-    assert is_not_empty([1, 2, 3]) is True
+    raw_input = ["ID-1234", "INVALID", "ID-98765", 100]
+    clean_data = process_with_validation(raw_input)
+    print(f"Processed {len(clean_data)} valid items.")
