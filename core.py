@@ -1,34 +1,32 @@
-import functools
-import time
-from typing import Any, Callable, Dict
+import logging
 
-# Cache for repetitive computational tasks
-_COMPUTATION_CACHE: Dict[str, Any] = {}
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def memoize_result(func: Callable) -> Callable:
-    """Decorator to cache expensive function calls."""
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
-        if key not in _COMPUTATION_CACHE:
-            _COMPUTATION_CACHE[key] = func(*args, **kwargs)
-        return _COMPUTATION_CACHE[key]
-    return wrapper
+def validate_payload(data):
+    """Ensures data is a non-empty dictionary."""
+    if not isinstance(data, dict):
+        raise ValueError(f"Invalid type: expected dict, got {type(data).__name__}")
+    if not data:
+        raise ValueError("Payload cannot be empty")
+    return True
 
-def batch_process(data: list, chunk_size: int = 100):
-    """Memory-efficient generator for large dataset batches."""
-    for i in range(0, len(data), chunk_size):
-        yield data[i:i + chunk_size]
+def process_items(items):
+    """
+    Main processing loop with input validation.
+    Iterates through a list of items and performs validation.
+    """
+    for index, item in enumerate(items):
+        try:
+            validate_payload(item)
+            logger.info(f"Processing item {index}: {item}")
+            # Simulate core business logic
+            result = item.get("value", 0) * 2
+            print(f"Result: {result}")
+        except (ValueError, TypeError) as e:
+            logger.error(f"Validation failed at index {index}: {e}")
+            continue
 
-class PerformanceOptimizer:
-    """Core utility for measuring and improving execution time."""
-    @staticmethod
-    def measure_execution(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            start = time.perf_counter()
-            result = func(*args, **kwargs)
-            end = time.perf_counter()
-            print(f"Execution time for {func.__name__}: {end - start:.4f}s")
-            return result
-        return wrapper
+if __name__ == '__main__':
+    data_batch = [{"value": 10}, {}, "invalid_string", {"value": 20}]
+    process_items(data_batch)
