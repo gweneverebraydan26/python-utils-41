@@ -1,35 +1,27 @@
 import re
 from typing import Any, Optional
 
-def validate_input(data: Any, expected_type: type, pattern: Optional[str] = None) -> bool:
-    """Validates input type and optional regex pattern."""
-    if not isinstance(data, expected_type):
+def is_valid_email(email: str) -> bool:
+    """Check if string is a valid email format."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def is_positive_integer(value: Any) -> bool:
+    """Check if input is an integer greater than zero."""
+    return isinstance(value, int) and value > 0
+
+def validate_length(text: str, min_len: int, max_len: Optional[int] = None) -> bool:
+    """Check if string length is within specified bounds."""
+    if not isinstance(text, str):
         return False
-    
-    if pattern and isinstance(data, str):
-        return bool(re.match(pattern, data))
-    
-    return True
+    if max_len is not None:
+        return min_len <= len(text) <= max_len
+    return len(text) >= min_len
 
-def process_with_validation(data_list: list) -> list:
-    """
-    Main processing loop with input sanitization.
-    Expects strings starting with 'ID-'.
-    """
-    validated_data = []
-    pattern = r'^ID-\d{4,8}$'
-    
-    for item in data_list:
-        # Validate type and format
-        if validate_input(item, str, pattern):
-            validated_data.append(item.strip())
-        else:
-            # Log invalid input (omitted for brevity)
-            continue
-            
-    return validated_data
+def is_non_empty_string(value: Any) -> bool:
+    """Check if input is a string with content."""
+    return isinstance(value, str) and len(value.strip()) > 0
 
-if __name__ == "__main__":
-    raw_input = ["ID-1234", "INVALID", "ID-98765", 100]
-    clean_data = process_with_validation(raw_input)
-    print(f"Processed {len(clean_data)} valid items.")
+def validate_choice(value: Any, options: list) -> bool:
+    """Check if value exists within provided choices."""
+    return value in options
