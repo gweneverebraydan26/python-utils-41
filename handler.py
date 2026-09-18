@@ -1,36 +1,45 @@
-from typing import Any, Dict, Optional, Callable
+import functools
+import time
+import logging
+from typing import Callable, Any, Dict
 
-class DataHandler:
-    """Handles incoming data payloads with configurable processors."""
+# Configure logger for performance monitoring
+logger = logging.getLogger('python-utils-41')
 
-    def __init__(self, default_strategy: Optional[Callable[[Any], Any]] = None) -> None:
-        self._strategy = default_strategy or (lambda x: x)
+_memoization_cache: Dict[str, Any] = {}
 
-    def process(self, data: Dict[str, Any], key: str) -> Any:
-        """
-        Extracts value by key and applies processing strategy.
-        
-        Args:
-            data: Dictionary containing source information.
-            key: Target key to retrieve.
-            
-        Returns:
-            The processed value associated with the key.
-        """
-        raw_value = data.get(key)
-        if raw_value is None:
-            raise ValueError(f"Missing required key: {key}")
-        return self._strategy(raw_value)
+def memoize(func: Callable) -> Callable:
+    """Cache function results to reduce redundant computation."""
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        key = f"{func.__name__}:{args}:{tuple(sorted(kwargs.items()))}"
+        if key not in _memoization_cache:
+            _memoization_cache[key] = func(*args, **kwargs)
+        return _memoization_cache[key]
+    return wrapper
 
-    def batch_process(self, items: list[Dict[str, Any]], key: str) -> list[Any]:
-        """
-        Processes a list of dictionaries for a specific key.
-        
-        Args:
-            items: List of data dictionaries.
-            key: Target key for each dictionary.
-            
-        Returns:
-            List of processed values.
-        """
-        return [self.process(item, key) for item in items]
+class PerformanceHandler:
+    """Utility class for performance-critical execution patterns."""
+    
+    @staticmethod
+    def batch_process(items: list, chunk_size: int = 100) -> list:
+        """Process items in memory-efficient generator chunks."""
+        for i in range(0, len(items), chunk_size):
+            yield items[i:i + chunk_size]
+
+    @staticmethod
+    def timed_execution(func: Callable) -> Callable:
+        """Decorator for logging execution time of core tasks."""
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            start = time.perf_counter()
+            result = func(*args, **kwargs)
+            duration = time.perf_counter() - start
+            logger.debug(f"execution of {func.__name__} took {duration:.4f}s")
+            return result
+        return wrapper
+
+    @staticmethod
+    def clear_cache() -> None:
+        """Reset global memoization storage."""
+        _memoization_cache.clear()
