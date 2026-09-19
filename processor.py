@@ -1,39 +1,34 @@
-import time
-import functools
 import logging
+from typing import Any, List, Optional
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def retry_operation(max_retries=3, delay=1.0, backoff=2.0, exceptions=(Exception,)):
-    """Decorator to retry network operations with exponential backoff."""
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            current_delay = delay
-            last_exception = None
+class DataProcessor:
+    """Standard utility for processing iterative datasets."""
 
-            for attempt in range(max_retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    last_exception = e
-                    if attempt == max_retries:
-                        break
-                    
-                    logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {current_delay}s...")
-                    time.sleep(current_delay)
-                    current_delay *= backoff
-            
-            logger.error(f"Operation failed after {max_retries} retries.")
-            raise last_exception
-        return wrapper
-    return decorator
+    def __init__(self, items: Optional[List[Any]] = None):
+        self.items = items or []
 
-@retry_operation(max_retries=3, delay=2.0)
-def fetch_network_data(url):
-    """Example function performing network I/O."""
-    # Simulating actual network logic
-    import random
-    if random.random() < 0.7:
-        raise ConnectionError("Temporary server timeout")
-    return {"status": "success", "url": url}
+    def clean(self) -> List[Any]:
+        """Remove null entries from the dataset."""
+        return [item for item in self.items if item is not None]
+
+    def validate(self, predicate: Any) -> bool:
+        """Ensure all items satisfy the provided condition."""
+        if not self.items:
+            return False
+        return all(predicate(i) for i in self.items)
+
+    def transform(self, func: Any) -> List[Any]:
+        """Apply mapping function to internal list."""
+        try:
+            return [func(i) for i in self.items]
+        except Exception as e:
+            logger.error(f"Transformation failed: {e}")
+            return []
+
+    @staticmethod
+    def create_batch(items: List[Any], size: int) -> List[List[Any]]:
+        """Split data into chunks of fixed size."""
+        return [items[i:i + size] for i in range(0, len(items), size)]
