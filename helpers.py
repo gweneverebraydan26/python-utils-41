@@ -1,42 +1,45 @@
-import functools
 import logging
-import random
-import time
+from typing import Any, Optional, Callable
 
-logger = logging.getLogger("python-utils.helpers")
+logger = logging.getLogger(__name__)
 
-
-def retry_on_failure(
-    exceptions=(Exception,),
-    tries=3,
-    delay=1.0,
-    backoff=2.0,
-    jitter=True,
-):
-    """Decorator for retrying functions with exponential backoff and jitter.
-
-    Particularly useful for handling transient network failures gracefully.
+def safe_execute(func: Callable, *args: Any, default: Any = None, **kwargs: Any) -> Any:
     """
+    Executes a function safely with comprehensive error handling.
+    Returns the default value if an exception occurs.
+    """
+    try:
+        return func(*args, **kwargs)
+    except (ValueError, TypeError, KeyError, IndexError) as e:
+        logger.warning(f"Standard edge case encountered in {func.__name__}: {e}")
+        return default
+    except Exception as e:
+        logger.error(f"Unexpected system failure in {func.__name__}: {e}", exc_info=True)
+        return default
 
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            mtries, mdelay = tries, delay
-            while mtries > 1:
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    logger.warning(
-                        f"Failed with {e.__class__.__name__}: {e}. Retrying in {mdelay:.2f}s..."
-                    )
-                    time.sleep(mdelay)
-                    mtries -= 1
-                    mdelay *= backoff
-                    if jitter:
-                        # Apply randomized jitter of +/- 50% of backoff
-                        mdelay *= random.uniform(0.5, 1.5)
-            return func(*args, **kwargs)
+def validate_input_range(value: Any, min_val: int, max_val: int) -> bool:
+    """
+    Validates that a value is within a specified numeric range.
+    Handles non-numeric types gracefully.
+    """
+    try:
+        if not isinstance(value, (int, float)):
+            return False
+        return min_val <= value <= max_val
+    except Exception:
+        return False
 
-        return wrapper
-
-    return decorator
+def get_nested_key(data: dict, keys: list, default: Any = None) -> Any:
+    """
+    Safely traverses a dictionary using a list of keys.
+    """
+    if not isinstance(data, dict):
+        return default
+    
+    curr = data
+    try:
+        for key in keys:
+            curr = curr[key]
+        return curr
+    except (KeyError, TypeError):
+        return default
