@@ -1,34 +1,33 @@
 import logging
-from logging.handlers import RotatingFileHandler
-import os
+import sys
+from typing import Optional
 
-def setup_logger(name: str, log_file: str = 'app.log', level: int = logging.INFO) -> logging.Logger:
-    """Configures a rotating file logger for the application."""
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
+class DataLogger:
+    """Utility class for standardized application logging."""
 
-    # Prevent duplicate handlers if logger is re-initialized
-    if not logger.handlers:
-        # Rotate logs after 5MB, keep 3 backups
-        handler = RotatingFileHandler(
-            log_file, 
-            maxBytes=5 * 1024 * 1024, 
-            backupCount=3
+    def __init__(self, name: str = "python-utils-41", level: int = logging.INFO):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(level)
+        
+        # Standard formatting for consistent log output
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
         
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        # Stream handler for stdout output
+        handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(formatter)
-        logger.addHandler(handler)
+        self.logger.addHandler(handler)
 
-        # Add console output
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
+    def info(self, message: str) -> None:
+        self.logger.info(message)
 
-    return logger
+    def error(self, message: str, exc: Optional[Exception] = None) -> None:
+        if exc:
+            self.logger.error(f"{message}: {str(exc)}", exc_info=True)
+        else:
+            self.logger.error(message)
 
-if __name__ == '__main__':
-    log = setup_logger('utils_logger')
-    log.info('logger initialization successful')
+def get_logger(name: str) -> DataLogger:
+    """Factory function for global logger access."""
+    return DataLogger(name)
