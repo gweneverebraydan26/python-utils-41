@@ -1,38 +1,80 @@
-from typing import Any, Iterable, Dict, List, Optional
-from collections import defaultdict
+from typing import Any, Callable, Dict, Iterable, Iterator, List, TypeVar
+import functools
+import time
 
-def deep_flatten(items: Iterable[Any]) -> List[Any]:
-    """Recursively flatten nested iterables into a single list."""
-    result = []
-    for item in items:
-        if isinstance(item, (list, tuple, set)):
-            result.extend(deep_flatten(item))
+T = TypeVar("T")
+
+
+def chunk_iterable(iterable: Iterable[T], chunk_size: int) -> Iterator[List[T]]:
+    """Yield successive chunks of a given size from an iterable.
+
+    Args:
+        iterable: The sequence or iterable to split into chunks.
+        chunk_size: The maximum size of each chunk.
+
+    Yields:
+        Lists containing elements from the iterable up to chunk_size.
+    """
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be greater than zero")
+
+    chunk: List[T] = []
+    for item in iterable:
+        chunk.append(item)
+        if len(chunk) == chunk_size:
+            yield chunk
+            chunk = []
+    if chunk:
+        yield chunk
+
+
+def flatten_dict(data: Dict[str, Any], parent_key: str = "", sep: str = ".") -> Dict[str, Any]:
+    """Recursively flatten a nested dictionary into a single-level dictionary.
+
+    Args:
+        data: The dictionary to flatten.
+        parent_key: Prefix for keys during recursion.
+        sep: Separator character for joined keys.
+
+    Returns:
+        A flattened dictionary with concatenated keys.
+    """
+    items: Dict[str, Any] = {}
+    for key, value in data.items():
+        new_key = f"{parent_key}{sep}{key}" if parent_key else key
+        if isinstance(value, dict):
+            items.update(flatten_dict(value, new_key, sep=sep))
         else:
-            result.append(item)
-    return result
+            items[new_key] = value
+    return items
 
-def group_by_key(items: Iterable[Dict[Any, Any]], key: str) -> Dict[Any, List[Dict[Any, Any]]]:
-    """Group a list of dictionaries by a common key value."""
-    groups = defaultdict(list)
-    for item in items:
-        val = item.get(key)
-        if val is not None:
-            groups[val].append(item)
-    return dict(groups)
 
-def sanitize_dict(data: Dict[Any, Any], keys_to_remove: Optional[List[str]] = None) -> Dict[Any, Any]:
-    """Return a new dictionary excluding specified keys."""
-    if not keys_to_remove:
-        return data.copy()
-    return {k: v for k, v in data.items() if k not in keys_to_remove}
+def retry_on_exception(
+    max_attempts: int = 3,
+    delay: float = 1.0,
+    exceptions: tuple = (Exception,)
+) -> Callable:
+    """Decorator that retries a function if it raises specified exceptions.
 
-def safe_get(data: Dict[Any, Any], path: str, default: Any = None) -> Any:
-    """Access nested dictionary values via dot notation path."""
-    keys = path.split('.')
-    curr = data
-    try:
-        for key in keys:
-            curr = curr[key]
-        return curr
-    except (KeyError, TypeError, AttributeError):
-        return default
+    Args:
+        max_attempts: Maximum number of execution attempts.
+        delay: Delay in seconds between retries.
+        exceptions: Tuple of exception classes to catch.
+
+    Returns:
+        Wrapped callable with retry behavior.
+    """
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            attempts = 0
+            while attempts < max_attempts:
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as err:
+                    attempts += 1
+                    if attempts >= max_attempts:
+                        raise err
+                    time.sleep(delay)
+        return wrapper
+    return decorator
