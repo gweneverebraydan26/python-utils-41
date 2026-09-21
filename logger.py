@@ -1,33 +1,42 @@
 import logging
-import sys
 from typing import Optional
 
-class DataLogger:
-    """Utility class for standardized application logging."""
+def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
+    """
+    Configures and returns a named logger instance.
 
-    def __init__(self, name: str = "python-utils-41", level: int = logging.INFO):
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(level)
-        
-        # Standard formatting for consistent log output
+    Args:
+        name: Unique identifier for the logger.
+        level: Logging threshold level.
+
+    Returns:
+        A configured logging.Logger object.
+    """
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+
+    if not logger.handlers:
+        handler = logging.StreamHandler()
         formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
-        
-        # Stream handler for stdout output
-        handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+        logger.addHandler(handler)
 
-    def info(self, message: str) -> None:
-        self.logger.info(message)
+    return logger
 
-    def error(self, message: str, exc: Optional[Exception] = None) -> None:
-        if exc:
-            self.logger.error(f"{message}: {str(exc)}", exc_info=True)
-        else:
-            self.logger.error(message)
+def log_message(logger: logging.Logger, message: str, level: str = "info") -> None:
+    """
+    Logs a message at the specified severity level.
 
-def get_logger(name: str) -> DataLogger:
-    """Factory function for global logger access."""
-    return DataLogger(name)
+    Args:
+        logger: The logging instance to use.
+        message: The text string to log.
+        level: Severity level (info, warning, error).
+    """
+    levels = {
+        "info": logging.INFO,
+        "warning": logging.WARNING,
+        "error": logging.ERROR
+    }
+    logger.log(levels.get(level.lower(), logging.INFO), message)
