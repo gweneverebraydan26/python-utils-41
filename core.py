@@ -1,32 +1,38 @@
-import logging
+from typing import Any, Iterable, Dict, List, Optional
+from collections import defaultdict
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+def deep_flatten(items: Iterable[Any]) -> List[Any]:
+    """Recursively flatten nested iterables into a single list."""
+    result = []
+    for item in items:
+        if isinstance(item, (list, tuple, set)):
+            result.extend(deep_flatten(item))
+        else:
+            result.append(item)
+    return result
 
-def validate_payload(data):
-    """Ensures data is a non-empty dictionary."""
-    if not isinstance(data, dict):
-        raise ValueError(f"Invalid type: expected dict, got {type(data).__name__}")
-    if not data:
-        raise ValueError("Payload cannot be empty")
-    return True
+def group_by_key(items: Iterable[Dict[Any, Any]], key: str) -> Dict[Any, List[Dict[Any, Any]]]:
+    """Group a list of dictionaries by a common key value."""
+    groups = defaultdict(list)
+    for item in items:
+        val = item.get(key)
+        if val is not None:
+            groups[val].append(item)
+    return dict(groups)
 
-def process_items(items):
-    """
-    Main processing loop with input validation.
-    Iterates through a list of items and performs validation.
-    """
-    for index, item in enumerate(items):
-        try:
-            validate_payload(item)
-            logger.info(f"Processing item {index}: {item}")
-            # Simulate core business logic
-            result = item.get("value", 0) * 2
-            print(f"Result: {result}")
-        except (ValueError, TypeError) as e:
-            logger.error(f"Validation failed at index {index}: {e}")
-            continue
+def sanitize_dict(data: Dict[Any, Any], keys_to_remove: Optional[List[str]] = None) -> Dict[Any, Any]:
+    """Return a new dictionary excluding specified keys."""
+    if not keys_to_remove:
+        return data.copy()
+    return {k: v for k, v in data.items() if k not in keys_to_remove}
 
-if __name__ == '__main__':
-    data_batch = [{"value": 10}, {}, "invalid_string", {"value": 20}]
-    process_items(data_batch)
+def safe_get(data: Dict[Any, Any], path: str, default: Any = None) -> Any:
+    """Access nested dictionary values via dot notation path."""
+    keys = path.split('.')
+    curr = data
+    try:
+        for key in keys:
+            curr = curr[key]
+        return curr
+    except (KeyError, TypeError, AttributeError):
+        return default
