@@ -1,17 +1,17 @@
 # python-utils-41
 
-A collection of lightweight, high-performance Python utilities designed to streamline repetitive development tasks. This library bridges common functional gaps in standard library workflows, focusing on performance and code readability.
+A collection of lightweight, high-performance Python utilities designed to streamline common development tasks. This library focuses on reducing boilerplate code for file operations, data validation, and asynchronous task management.
 
 ## Features
 
-*   **Robust File Operations:** Advanced wrappers for recursive file processing, bulk renaming, and structured directory scanning.
-*   **Dict-to-Object Mapper:** A zero-dependency utility to cast nested dictionaries into dot-notation accessible objects.
-*   **Performance Decorators:** Pre-built function wrappers for intelligent caching, execution timing, and retry logic with exponential backoff.
-*   **Type-Safe Converters:** Strict data transformers for complex JSON-to-CSV exports and environmental variable normalization.
+*   **Robust File I/O:** Simplified wrappers for rapid directory traversal, pattern-based file searching, and atomic JSON serialization.
+*   **Data Validation:** A lightweight set of decorators for schema validation and type-checking, minimizing runtime errors in production.
+*   **Async Helpers:** Intuitive utility functions for batching asynchronous tasks and managing concurrent subprocesses with ease.
+*   **String Formatting:** Optimized patterns for common data sanitization tasks, including slug generation and complex delimiter parsing.
 
 ## Installation
 
-Install `python-utils-41` directly via pip:
+Install the package directly via pip:
 
 ```bash
 pip install python-utils-41
@@ -23,26 +23,26 @@ Or add it to your `requirements.txt`:
 python-utils-41>=1.0.0
 ```
 
-## Usage Example
+## Usage
 
-Import the core modules to simplify your daily workflow:
+Here is a quick example demonstrating how to use the file-caching utility to handle JSON storage:
 
 ```python
-from pyutils41 import Mapper, Timer
+from pyutils41.io import json_cache
 
-# Map dictionaries to objects
-data = {"user": {"id": 41, "name": "Admin"}}
-user = Mapper.to_obj(data)
-print(user.user.name)  # Output: Admin
+# Decorate a function to automatically cache output to a file
+@json_cache(filename="data.json", ttl=3600)
+def fetch_external_data():
+    return {"status": "success", "payload": [1, 2, 3]}
 
-# Time your function execution
-@Timer.log
-def process_data():
-    return [i**2 for i in range(1000)]
-
-process_data() 
-# Logs: 'process_data' finished in 0.00012s
+# The first call fetches data, subsequent calls within an hour load from disk
+data = fetch_external_data()
+print(data['status'])
 ```
+
+## Contributing
+
+We welcome contributions! Please open an issue for feature requests or submit a pull request for bug fixes. Ensure all new code includes corresponding tests in the `tests/` directory.
 
 ## License
 
