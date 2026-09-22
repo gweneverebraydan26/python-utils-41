@@ -1,49 +1,41 @@
 import os
-from typing import Any, Callable, TypeVar
+import json
+from typing import Any, Dict
 
-T = TypeVar("T")
+def load_config(file_path: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Loads configuration from a JSON file with specified default values.
+    """
+    config = defaults.copy()
 
+    if not os.path.exists(file_path):
+        return config
 
-class ConfigManager:
-    """A configuration utility to retrieve and cast environment variables safely."""
+    try:
+        with open(file_path, 'r') as f:
+            user_config = json.load(f)
+            if isinstance(user_config, dict):
+                config.update(user_config)
+    except (json.JSONDecodeError, IOError):
+        pass
 
-    def __init__(self, prefix: str = "") -> None:
-        """Initialize the manager with an optional environment variable prefix.
+    return config
 
-        Args:
-            prefix: A prefix to prepended to all environment variable lookups.
-        """
-        self.prefix = prefix
-
-    def _build_key(self, key: str) -> str:
-        """Construct the full environment variable key name."""
-        return f"{self.prefix}{key}" if self.prefix else key
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Retrieve an environment variable value as a string.
-
-        Args:
-            key: The configuration option name.
-            default: The fallback value if the environment variable is not set.
-        """
-        full_key = self._build_key(key)
-        return os.environ.get(full_key, default)
-
-    def get_as(self, key: str, cast_type: Callable[[str], T], default: T) -> T:
-        """Retrieve an environment variable and safely cast it to a target type.
-
-        Args:
-            key: The configuration option name.
-            cast_type: A callable used to cast the string value (e.g., int, float).
-            default: The fallback value if configuration is missing or casting fails.
-        """
-        val = self.get(key)
-        if val is None:
-            return default
-        
-        try:
-            if cast_type is bool:
-                return str(val).lower() in ("true", "1", "t", "y", "yes")  # type: ignore
-            return cast_type(val)
-        except (ValueError, TypeError):
-            return default
+def get_env_config(prefix: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Loads configuration from environment variables prefixed with the given string.
+    """
+    config = defaults.copy()
+    for key in defaults.keys():
+        env_key = f"{prefix}_{key.upper()}"
+        value = os.environ.get(env_key)
+        if value is not None:
+            # Attempt simple type casting based on default type
+            default_val = defaults[key]
+            if isinstance(default_val, bool):
+                config[key] = value.lower() in ('true', '1', 'yes')
+            elif isinstance(default_val, int):
+                config[key] = int(value)
+            else:
+                config[key] = value
+    return config
