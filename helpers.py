@@ -1,45 +1,35 @@
-import logging
-from typing import Any, Optional, Callable
+import json
+import os
+from typing import Any, Dict, Optional
 
-logger = logging.getLogger(__name__)
+def ensure_directory(path: str) -> None:
+    """Creates directory if it does not exist."""
+    if not os.path.exists(path):
+        os.makedirs(path)
 
-def safe_execute(func: Callable, *args: Any, default: Any = None, **kwargs: Any) -> Any:
-    """
-    Executes a function safely with comprehensive error handling.
-    Returns the default value if an exception occurs.
-    """
-    try:
-        return func(*args, **kwargs)
-    except (ValueError, TypeError, KeyError, IndexError) as e:
-        logger.warning(f"Standard edge case encountered in {func.__name__}: {e}")
-        return default
-    except Exception as e:
-        logger.error(f"Unexpected system failure in {func.__name__}: {e}", exc_info=True)
-        return default
+def load_json(file_path: str) -> Dict[str, Any]:
+    """Loads and parses a JSON file."""
+    if not os.path.exists(file_path):
+        return {}
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
-def validate_input_range(value: Any, min_val: int, max_val: int) -> bool:
-    """
-    Validates that a value is within a specified numeric range.
-    Handles non-numeric types gracefully.
-    """
-    try:
-        if not isinstance(value, (int, float)):
-            return False
-        return min_val <= value <= max_val
-    except Exception:
-        return False
+def save_json(data: Dict[str, Any], file_path: str) -> None:
+    """Writes dictionary data to a JSON file."""
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4)
 
-def get_nested_key(data: dict, keys: list, default: Any = None) -> Any:
-    """
-    Safely traverses a dictionary using a list of keys.
-    """
-    if not isinstance(data, dict):
-        return default
-    
-    curr = data
-    try:
-        for key in keys:
-            curr = curr[key]
-        return curr
-    except (KeyError, TypeError):
-        return default
+def get_env_variable(key: str, default: Optional[str] = None) -> str:
+    """Retrieves environment variable with optional default."""
+    return os.getenv(key, default or "")
+
+def flatten_dict(data: Dict[str, Any], parent_key: str = '', sep: str = '_') -> Dict[str, Any]:
+    """Flattens a nested dictionary into a flat one."""
+    items = []
+    for k, v in data.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
