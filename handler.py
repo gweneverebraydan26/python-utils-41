@@ -1,40 +1,29 @@
-import logging
-from typing import Any, Callable, Optional
+from typing import Any, Dict, Optional, Callable
 
-logger = logging.getLogger(__name__)
+class DataHandler:
+    """Utility class for processing dictionaries with transformation logic."""
 
-class OperationHandler:
-    """Utility class for robust function execution."""
+    def __init__(self, default_value: Any = None) -> None:
+        """Initialize handler with a fallback default."""
+        self.default_value = default_value
 
-    @staticmethod
-    def safe_execute(func: Callable, *args: Any, default: Any = None, **kwargs: Any) -> Any:
-        """Executes a function and returns default value on failure."""
-        try:
-            return func(*args, **kwargs)
-        except (ValueError, TypeError, KeyError, IndexError) as e:
-            logger.error(f"Data processing error in {func.__name__}: {e}")
-            return default
-        except Exception as e:
-            logger.critical(f"Unexpected system failure in {func.__name__}: {e}", exc_info=True)
-            raise
+    def process(self, data: Dict[str, Any], key: str, transform: Optional[Callable[[Any], Any]] = None) -> Any:
+        """Retrieve value from dictionary with optional transformation.
 
-    def validate_input(self, value: Any, expected_type: type) -> bool:
-        """Validates input types to prevent runtime crashes."""
-        if value is None:
-            return False
-        if not isinstance(value, expected_type):
-            logger.warning(f"Type mismatch: expected {expected_type}, got {type(value)}")
-            return False
-        return True
+        Args:
+            data: Input dictionary to query.
+            key: The key to look up.
+            transform: Optional function to apply to the value if found.
 
-    def process_with_retry(self, func: Callable, retries: int = 3) -> Optional[Any]:
-        """Executes logic with basic retry mechanism for intermittent issues."""
-        for attempt in range(retries):
-            try:
-                return func()
-            except Exception as e:
-                if attempt == retries - 1:
-                    logger.error(f"Final attempt failed for {func.__name__}")
-                    return None
-                continue
-        return None
+        Returns:
+            Transformed value or default_value if missing.
+        """
+        if key not in data:
+            return self.default_value
+
+        value = data[key]
+        return transform(value) if transform else value
+
+    def batch_process(self, items: list[Dict[str, Any]], key: str) -> list[Any]:
+        """Extract values for a specific key across a list of dictionaries."""
+        return [item.get(key, self.default_value) for item in items]
