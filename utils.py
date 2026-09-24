@@ -1,32 +1,36 @@
 import functools
-import re
-from typing import List, Dict, Any, Generator
+import time
+import collections
+from typing import Callable, Any, Dict
 
-WHITESPACE_RE = re.compile(r'\s+')
-NON_ALPHANUMERIC_RE = re.compile(r'[^a-zA-Z0-9\s]')
+# Cache implementation for performance optimization
+# Stores function results to avoid redundant computations
+_cache: Dict[tuple, Any] = {}
 
-@functools.lru_cache(maxsize=1024)
-def sanitize_string(text: str) -> str:
-    """Sanitize and normalize text with memoized caching for fast repeats."""
-    if not text:
-        return ""
-    text = NON_ALPHANUMERIC_RE.sub('', text)
-    return WHITESPACE_RE.sub(' ', text).strip().lower()
+def memoize(func: Callable) -> Callable:
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs) -> Any:
+        key = (func.__name__, args, frozenset(kwargs.items()))
+        if key not in _cache:
+            _cache[key] = func(*args, **kwargs)
+        return _cache[key]
+    return wrapper
 
-def batch_process_items(items: List[Dict[str, Any]], batch_size: int = 100) -> Generator[List[Dict[str, Any]], None, None]:
-    """Yield batches of dictionary items to reduce memory overhead."""
-    for i in range(0, len(items), batch_size):
-        yield items[i:i + batch_size]
+def batch_process(data: list, size: int = 100):
+    """Generator for efficient chunking of large datasets"""
+    for i in range(0, len(data), size):
+        yield data[i:i + size]
 
-def memoized_flatten(nested_list: List[Any]) -> List[Any]:
-    """Efficiently flatten a nested list using an iterative stack."""
-    flat_list = []
-    stack = [nested_list]
-    while stack:
-        current = stack.pop()
-        for item in reversed(current):
-            if isinstance(item, list):
-                stack.append(item)
-            else:
-                flat_list.append(item)
-    return flat_list
+def timed_execution(func: Callable) -> Callable:
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        duration = time.perf_counter() - start
+        print(f"Function {func.__name__} executed in {duration:.4f}s")
+        return result
+    return wrapper
+
+def clear_cache() -> None:
+    """Manual memory management for internal caches"""
+    _cache.clear()
