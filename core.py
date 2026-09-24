@@ -1,41 +1,51 @@
-from typing import Any, Dict, Optional
+import functools
+import time
+import logging
 
+# Configure performance logger
+logger = logging.getLogger(__name__)
 
-def flatten_dict(d: Dict[str, Any], parent_key: str = "", sep: str = ".") -> Dict[str, Any]:
-    """Recursively flatten a nested dictionary using key path delimiters."""
-    items: list = []
-    for k, v in d.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else str(k)
-        if isinstance(v, dict) and v:
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
+def memoize_with_ttl(ttl_seconds=300):
+    """Decorator for caching function results with time-to-live."""
+    def decorator(func):
+        cache = {}
 
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            key = (args, tuple(sorted(kwargs.items())))
+            now = time.time()
+            
+            if key in cache:
+                result, timestamp = cache[key]
+                if now - timestamp < ttl_seconds:
+                    return result
+            
+            result = func(*args, **kwargs)
+            cache[key] = (result, now)
+            return result
+        return wrapper
+    return decorator
 
-def unflatten_dict(d: Dict[str, Any], sep: str = ".") -> Dict[str, Any]:
-    """Reconstruct a nested dictionary from a flattened key-value structure."""
-    result: Dict[str, Any] = {}
-    for key, value in d.items():
-        parts = key.split(sep)
-        target = result
-        for part in parts[:-1]:
-            if part not in target or not isinstance(target[part], dict):
-                target[part] = {}
-            target = target[part]
-        target[parts[-1]] = value
-    return result
+@memoize_with_ttl(ttl_seconds=60)
+def compute_heavy_operation(data_index: int) -> dict:
+    """Simulates expensive computation with cached results."""
+    # Simulate latency
+    time.sleep(0.5)
+    return {"index": data_index, "timestamp": time.time()}
 
+class DataProcessor:
+    """Core processor for high-frequency data handling."""
+    def __init__(self, buffer_size=1024):
+        self.buffer = []
+        self.buffer_size = buffer_size
 
-def deep_get(
-    d: Dict[str, Any], key_path: str, default: Optional[Any] = None, sep: str = "."
-) -> Any:
-    """Safely fetch a value from a nested dict using a delimited key path."""
-    keys = key_path.split(sep)
-    current = d
-    for k in keys:
-        if isinstance(current, dict) and k in current:
-            current = current[k]
-        else:
-            return default
-    return current
+    def process_batch(self, items: list):
+        """Batch processing optimization to reduce I/O overhead."""
+        self.buffer.extend(items)
+        if len(self.buffer) >= self.buffer_size:
+            self._flush()
+
+    def _flush(self):
+        """Internal method to clear memory buffer."""
+        logger.info(f"Flushing {len(self.buffer)} items to storage")
+        self.buffer.clear()
