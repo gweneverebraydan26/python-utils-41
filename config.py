@@ -1,41 +1,34 @@
-import os
 import json
+import os
 from typing import Any, Dict
 
-def load_config(file_path: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Loads configuration from a JSON file with specified default values.
-    """
-    config = defaults.copy()
+class ConfigLoader:
+    """Handles loading configuration from JSON files with fallback defaults."""
 
-    if not os.path.exists(file_path):
+    def __init__(self, default_config: Dict[str, Any] = None):
+        self.defaults = default_config or {}
+
+    def load(self, filepath: str) -> Dict[str, Any]:
+        """Loads configuration from a file, merging with default values."""
+        config = self.defaults.copy()
+        
+        if not os.path.exists(filepath):
+            return config
+
+        try:
+            with open(filepath, 'r') as f:
+                loaded_data = json.load(f)
+                if isinstance(loaded_data, dict):
+                    config.update(loaded_data)
+        except (json.JSONDecodeError, IOError):
+            # Return defaults if file is corrupt or unreadable
+            pass
+            
         return config
 
-    try:
-        with open(file_path, 'r') as f:
-            user_config = json.load(f)
-            if isinstance(user_config, dict):
-                config.update(user_config)
-    except (json.JSONDecodeError, IOError):
-        pass
-
-    return config
-
-def get_env_config(prefix: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Loads configuration from environment variables prefixed with the given string.
-    """
-    config = defaults.copy()
-    for key in defaults.keys():
-        env_key = f"{prefix}_{key.upper()}"
-        value = os.environ.get(env_key)
-        if value is not None:
-            # Attempt simple type casting based on default type
-            default_val = defaults[key]
-            if isinstance(default_val, bool):
-                config[key] = value.lower() in ('true', '1', 'yes')
-            elif isinstance(default_val, int):
-                config[key] = int(value)
-            else:
-                config[key] = value
-    return config
+# Example Usage:
+if __name__ == '__main__':
+    defaults = {'host': 'localhost', 'port': 8080}
+    loader = ConfigLoader(defaults)
+    current_config = loader.load('config.json')
+    print(f"Loaded config: {current_config}")
