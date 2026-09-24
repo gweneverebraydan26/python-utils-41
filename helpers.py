@@ -1,35 +1,35 @@
-import json
 import os
-from typing import Any, Dict, Optional
+import json
+import logging
+from typing import Any, Optional
 
-def ensure_directory(path: str) -> None:
+def ensure_dir(path: str) -> None:
     """Creates directory if it does not exist."""
     if not os.path.exists(path):
         os.makedirs(path)
 
-def load_json(file_path: str) -> Dict[str, Any]:
-    """Loads and parses a JSON file."""
-    if not os.path.exists(file_path):
-        return {}
-    with open(file_path, 'r', encoding='utf-8') as f:
+def save_json(data: Any, filepath: str) -> None:
+    """Serializes data to a JSON file."""
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4, sort_keys=True)
+
+def load_json(filepath: str) -> Optional[Any]:
+    """Loads data from a JSON file."""
+    if not os.path.exists(filepath):
+        return None
+    with open(filepath, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-def save_json(data: Dict[str, Any], file_path: str) -> None:
-    """Writes dictionary data to a JSON file."""
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=4)
+def get_env_var(key: str, default: str = '') -> str:
+    """Retrieves environment variable with fallback."""
+    return os.environ.get(key, default)
 
-def get_env_variable(key: str, default: Optional[str] = None) -> str:
-    """Retrieves environment variable with optional default."""
-    return os.getenv(key, default or "")
-
-def flatten_dict(data: Dict[str, Any], parent_key: str = '', sep: str = '_') -> Dict[str, Any]:
-    """Flattens a nested dictionary into a flat one."""
-    items = []
-    for k, v in data.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
+def setup_basic_logger(name: str) -> logging.Logger:
+    """Configures a standard logger instance."""
+    logger = logging.getLogger(name)
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    return logger
