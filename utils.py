@@ -1,31 +1,59 @@
-import json
-from typing import Any, Dict, Optional
+import time
+import random
+import functools
+from typing import Callable, Any, Type, Tuple
 
-def safe_json_load(data: str, default: Optional[Dict] = None) -> Dict:
-    """
-    Safely parses a JSON string into a dictionary.
-    Returns the default value if parsing fails.
-    """
-    try:
-        return json.loads(data)
-    except (json.JSONDecodeError, TypeError):
-        return default if default is not None else {}
 
-def flatten_dict(d: Dict[str, Any], parent_key: str = '', sep: str = '_') -> Dict[str, Any]:
+def retry(
+    retries: int = 3,
+    backoff_factor: float = 0.5,
+    exceptions: Tuple[Type[BaseException], ...] = (Exception,),
+    jitter: bool = True,
+) -> Callable:
     """
-    Flattens a nested dictionary into a single level.
-    """
-    items = []
-    for k, v in d.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
+    Decorator that retries a function if specified exceptions are raised.
 
-def filter_none_values(data: Dict[str, Any]) -> Dict[str, Any]:
+    Uses exponential backoff with optional random jitter.
     """
-    Removes keys with None values from a dictionary.
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            attempts = 0
+            while True:
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as err:
+                    attempts += 1
+                    if attempts > retries:
+                        raise err
+                    
+                    delay = backoff_factor * (2 ** (attempts - 1))
+                    if jitter:
+                        delay += random.uniform(0, delay * 0.1)
+                    
+                    time.sleep(delay)
+
+        return wrapper
+    return decorator
+
+
+def retry_call(
+    func: Callable,
+    args: Tuple[Any, ...] = (),
+    kwargs: dict = None,
+    retries: int = 3,
+    backoff_factor: float = 0.5,
+    exceptions: Tuple[Type[BaseException], ...] = (Exception,),
+) -> Any:
     """
-    return {k: v for k, v in data.items() if v is not None}
+    Executes a callable with retry logic and exponential backoff.
+    """
+    if kwargs is None:
+        kwargs = {}
+    
+    decorated = retry(
+        retries=retries,
+        backoff_factor=backoff_factor,
+        exceptions=exceptions,
+    )(func)
+    return decorated(*args, **kwargs)
