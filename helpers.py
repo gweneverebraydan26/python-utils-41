@@ -1,33 +1,41 @@
-import json
-import os
-from typing import Any, Dict, Optional
+import functools
+import logging
+import time
+from typing import Callable, Any, Tuple, Type
 
-def load_json_file(filepath: str) -> Dict[str, Any]:
-    """Reads and parses a JSON file from disk."""
-    if not os.path.exists(filepath):
-        return {}
-    with open(filepath, 'r', encoding='utf-8') as f:
-        return json.load(f)
+logger = logging.getLogger(__name__)
 
-def save_json_file(data: Any, filepath: str) -> None:
-    """Serializes data to a JSON file."""
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=4)
+def retry(
+    exceptions: Tuple[Type[BaseException], ...] = (Exception,),
+    tries: int = 3,
+    delay: float = 1.0,
+    backoff: float = 2.0,
+) -> Callable:
+    """
+    Decorator that retries a function with exponential backoff.
 
-def get_env_variable(key: str, default: Optional[str] = None) -> Optional[str]:
-    """Retrieves environment variable with fallback."""
-    return os.environ.get(key, default)
-
-def chunk_list(data: list, size: int):
-    """Splits a list into smaller chunks."""
-    for i in range(0, len(data), size):
-        yield data[i:i + size]
-
-def sanitize_string(text: str) -> str:
-    """Removes whitespace and converts to lowercase."""
-    return str(text).strip().lower()
-
-def ensure_directory(path: str) -> None:
-    """Creates a directory if it does not exist."""
-    if not os.path.exists(path):
-        os.makedirs(path)
+    :param exceptions: A tuple of exceptions to catch and retry on.
+    :param tries: The maximum number of times to try the function.
+    :param delay: Initial delay between retries in seconds.
+    :param backoff: Multiplier applied to delay after each retry.
+    """
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            attempt_delay = delay
+            for attempt in range(1, tries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    if attempt == tries:
+                        logger.error(
+                            f"Function '{func.__name__}' failed after {tries} attempts. Error: {e}"
+                        )
+                        raise
+                    logger.warning(
+                        f"Retrying '{func.__name__}' in {attempt_delay:.2f} seconds... (Attempt {attempt}/{tries}) due to: {e}"
+                    )
+                    time.sleep(attempt_delay)
+                    attempt_delay *= backoff
+        return wrapper
+    return decorator
