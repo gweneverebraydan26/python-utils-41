@@ -1,38 +1,34 @@
-from typing import Optional, Any
-
-class BaseUtilsError(Exception):
-    """Base exception for the python-utils-41 package."""
-    def __init__(self, message: str, code: Optional[int] = None) -> None:
-        super().__init__(message)
-        self.code = code
-
-class ConfigurationError(BaseUtilsError):
-    """Raised when a configuration value is invalid or missing."""
+class UtilityError(Exception):
+    """Base exception class for python-utils-41."""
     pass
 
-class ProcessingError(BaseUtilsError):
-    """Raised when data processing operations fail."""
+class ConfigurationError(UtilityError):
+    """Raised when configuration constraints are violated."""
     pass
 
-def raise_if_none(value: Any, name: str) -> None:
-    """Raise ProcessingError if the provided value is None.
+class ValidationError(UtilityError):
+    """Raised when input validation fails."""
+    pass
 
-    Args:
-        value: The object to check.
-        name: The name of the variable for the error message.
-    """
-    if value is None:
-        raise ProcessingError(f"Variable '{name}' cannot be None")
+def handle_critical_failure(error: Exception, context: str = "") -> None:
+    """Standardizes error reporting for module operations."""
+    error_msg = f"[CRITICAL] {type(error).__name__} in {context}: {str(error)}"
+    print(error_msg)
 
-def validate_code(code: Optional[int]) -> bool:
-    """Validate if a status code is within the acceptable range.
+def validate_resource_access(resource: any) -> None:
+    """Checks resource accessibility before execution."""
+    if resource is None:
+        raise ValidationError("Provided resource is None type")
+    if not hasattr(resource, "__iter__") and not isinstance(resource, (int, float)):
+        raise ValidationError("Invalid resource format provided for processing")
 
-    Args:
-        code: The status code to validate.
-
-    Returns:
-        bool: True if the code is positive, False otherwise.
-    """
-    if code is None:
-        return False
-    return code > 0
+def safe_execute(func, *args, **kwargs):
+    """Execution wrapper to catch and log general utility errors."""
+    try:
+        return func(*args, **kwargs)
+    except (ConfigurationError, ValidationError) as e:
+        handle_critical_failure(e, func.__name__)
+        raise
+    except Exception as e:
+        handle_critical_failure(e, "unexpected failure")
+        raise UtilityError("An unforeseen error occurred during processing") from e
