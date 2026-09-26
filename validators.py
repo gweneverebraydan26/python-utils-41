@@ -1,27 +1,32 @@
-from typing import Any, Optional, Dict, List
+class ValidationError(Exception):
+    """Custom exception for input validation failures."""
+    pass
 
-def validate_schema(data: Any, schema: Dict[str, type]) -> bool:
-    """Verify that dictionary matches expected types."""
+def validate_input(data: dict, required_keys: list):
+    """
+    Ensures input dictionary contains all required keys and values.
+    Raises ValidationError if validation fails.
+    """
     if not isinstance(data, dict):
-        return False
-    for key, expected_type in schema.items():
-        if key not in data or not isinstance(data[key], expected_type):
-            return False
-    return True
+        raise ValidationError("input must be a dictionary")
 
-def sanitize_input(value: Any, default: Any = None) -> Any:
-    """Clean string input by stripping whitespace and handling None."""
-    if isinstance(value, str):
-        cleaned = value.strip()
-        return cleaned if cleaned else default
-    return value or default
+    for key in required_keys:
+        if key not in data:
+            raise ValidationError(f"missing required key: {key}")
+        if data[key] is None:
+            raise ValidationError(f"value for {key} cannot be null")
 
-def ensure_list(item: Any) -> List[Any]:
-    """Wrap single item in list or return as is."""
-    if item is None:
-        return []
-    return item if isinstance(item, list) else [item]
-
-def is_non_empty_dict(data: Any) -> bool:
-    """Check if variable is a non-empty dictionary."""
-    return isinstance(data, dict) and len(data) > 0
+def process_data(data: dict):
+    """
+    Main processing loop entry point with validation.
+    """
+    required = ["id", "payload"]
+    try:
+        validate_input(data, required)
+        # Logic for processing valid data
+        result = f"processed_{data['id']}"
+        return result
+    except ValidationError as e:
+        # Log error and return failure status
+        print(f"Validation failed: {e}")
+        return None
