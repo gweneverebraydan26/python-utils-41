@@ -1,51 +1,40 @@
 import functools
-import time
-import logging
+import itertools
+from typing import Any, Callable, Dict, List, Sequence, Tuple
 
-# Configure performance logger
-logger = logging.getLogger(__name__)
 
-def memoize_with_ttl(ttl_seconds=300):
-    """Decorator for caching function results with time-to-live."""
-    def decorator(func):
-        cache = {}
+class FastDataProcessor:
+    """Core processor optimized for batched memoized operations."""
 
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            key = (args, tuple(sorted(kwargs.items())))
-            now = time.time()
+    __slots__ = ('_cache', '_batch_size')
+
+    def __init__(self, batch_size: int = 1000) -> None:
+        self._batch_size = max(1, batch_size)
+        self._cache: Dict[Tuple[Any, ...], Any] = {}
+
+    def memoized_transform(self, func: Callable[..., Any], *args: Any) -> Any:
+        """Executes function with fast dictionary caching based on arguments."""
+        key = (func, args)
+        if key not in self._cache:
+            self._cache[key] = func(*args)
+        return self._cache[key]
+
+    def process_chunks(
+        self, data: Sequence[Any], transform_fn: Callable[[Any], Any]
+    ) -> List[Any]:
+        """Transforms iterable data in optimized chunks to reduce memory footprint."""
+        iterator = iter(data)
+        results = []
+        
+        while True:
+            chunk = list(itertools.islice(iterator, self._batch_size))
+            if not chunk:
+                break
+            # Process chunk using list comprehension for optimized execution
+            results.extend([transform_fn(item) for item in chunk])
             
-            if key in cache:
-                result, timestamp = cache[key]
-                if now - timestamp < ttl_seconds:
-                    return result
-            
-            result = func(*args, **kwargs)
-            cache[key] = (result, now)
-            return result
-        return wrapper
-    return decorator
+        return results
 
-@memoize_with_ttl(ttl_seconds=60)
-def compute_heavy_operation(data_index: int) -> dict:
-    """Simulates expensive computation with cached results."""
-    # Simulate latency
-    time.sleep(0.5)
-    return {"index": data_index, "timestamp": time.time()}
-
-class DataProcessor:
-    """Core processor for high-frequency data handling."""
-    def __init__(self, buffer_size=1024):
-        self.buffer = []
-        self.buffer_size = buffer_size
-
-    def process_batch(self, items: list):
-        """Batch processing optimization to reduce I/O overhead."""
-        self.buffer.extend(items)
-        if len(self.buffer) >= self.buffer_size:
-            self._flush()
-
-    def _flush(self):
-        """Internal method to clear memory buffer."""
-        logger.info(f"Flushing {len(self.buffer)} items to storage")
-        self.buffer.clear()
+    def clear_cache(self) -> None:
+        """Purges internal performance cache."""
+        self._cache.clear()
