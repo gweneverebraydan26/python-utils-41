@@ -1,41 +1,35 @@
-import functools
-import logging
-import time
-from typing import Callable, Any, Tuple, Type
+import json
+import os
+from typing import Any, Dict, Optional
 
-logger = logging.getLogger(__name__)
+def load_json_file(file_path: str) -> Dict[str, Any]:
+    """Reads a JSON file and returns a dictionary."""
+    if not os.path.exists(file_path):
+        return {}
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
-def retry(
-    exceptions: Tuple[Type[BaseException], ...] = (Exception,),
-    tries: int = 3,
-    delay: float = 1.0,
-    backoff: float = 2.0,
-) -> Callable:
-    """
-    Decorator that retries a function with exponential backoff.
+def save_json_file(file_path: str, data: Dict[str, Any]) -> None:
+    """Writes a dictionary to a JSON file."""
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4)
 
-    :param exceptions: A tuple of exceptions to catch and retry on.
-    :param tries: The maximum number of times to try the function.
-    :param delay: Initial delay between retries in seconds.
-    :param backoff: Multiplier applied to delay after each retry.
-    """
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            attempt_delay = delay
-            for attempt in range(1, tries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    if attempt == tries:
-                        logger.error(
-                            f"Function '{func.__name__}' failed after {tries} attempts. Error: {e}"
-                        )
-                        raise
-                    logger.warning(
-                        f"Retrying '{func.__name__}' in {attempt_delay:.2f} seconds... (Attempt {attempt}/{tries}) due to: {e}"
-                    )
-                    time.sleep(attempt_delay)
-                    attempt_delay *= backoff
-        return wrapper
-    return decorator
+def get_env_variable(key: str, default: Optional[str] = None) -> str:
+    """Retrieves environment variable with fallback default."""
+    return os.getenv(key, default) or ""
+
+def chunk_list(data: list, size: int):
+    """Splits a list into smaller chunks of fixed size."""
+    for i in range(0, len(data), size):
+        yield data[i:i + size]
+
+def flatten_dict(d: Dict, parent_key: str = '', sep: str = '_') -> Dict:
+    """Flattens a nested dictionary into a single level."""
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
