@@ -1,59 +1,55 @@
-import time
-import random
-import functools
-from typing import Callable, Any, Type, Tuple
+from typing import Any, Dict, List, Optional, Union
+import math
 
 
-def retry(
-    retries: int = 3,
-    backoff_factor: float = 0.5,
-    exceptions: Tuple[Type[BaseException], ...] = (Exception,),
-    jitter: bool = True,
-) -> Callable:
-    """
-    Decorator that retries a function if specified exceptions are raised.
-
-    Uses exponential backoff with optional random jitter.
-    """
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            attempts = 0
-            while True:
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as err:
-                    attempts += 1
-                    if attempts > retries:
-                        raise err
-                    
-                    delay = backoff_factor * (2 ** (attempts - 1))
-                    if jitter:
-                        delay += random.uniform(0, delay * 0.1)
-                    
-                    time.sleep(delay)
-
-        return wrapper
-    return decorator
-
-
-def retry_call(
-    func: Callable,
-    args: Tuple[Any, ...] = (),
-    kwargs: dict = None,
-    retries: int = 3,
-    backoff_factor: float = 0.5,
-    exceptions: Tuple[Type[BaseException], ...] = (Exception,),
-) -> Any:
-    """
-    Executes a callable with retry logic and exponential backoff.
-    """
-    if kwargs is None:
-        kwargs = {}
+def safe_get(data: Any, keys: List[Union[str, int]], default: Optional[Any] = None) -> Any:
+    """Safely retrieve nested values from dictionaries or lists without raising exceptions."""
+    if not isinstance(keys, (list, tuple)):
+        return default
     
-    decorated = retry(
-        retries=retries,
-        backoff_factor=backoff_factor,
-        exceptions=exceptions,
-    )(func)
-    return decorated(*args, **kwargs)
+    current = data
+    for key in keys:
+        if isinstance(current, dict) and isinstance(key, str):
+            current = current.get(key, default)
+        elif isinstance(current, (list, tuple)) and isinstance(key, int):
+            try:
+                current = current[key]
+            except IndexError:
+                return default
+        else:
+            return default
+        
+        if current is default:
+            break
+            
+    return current
+
+
+def safe_divide(numerator: Union[int, float], denominator: Union[int, float], default: Optional[float] = 0.0) -> Optional[float]:
+    """Perform division safely handling ZeroDivisionError, TypeError, and NaN/Infinity cases."""
+    try:
+        num = float(numerator)
+        den = float(denominator)
+        if den == 0.0 or math.isnan(num) or math.isnan(den):
+            return default
+        res = num / den
+        return res if not math.isinf(res) else default
+    except (ValueError, TypeError):
+        return default
+
+
+def parse_bool(value: Any, default: bool = False) -> bool:
+    """Robust boolean parser handling string representations and edge cases."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        clean_str = value.strip().lower()
+        if clean_str in {"true", "1", "yes", "y", "on", "t"}:
+            return True
+        if clean_str in {"false", "0", "no", "n", "off", "f"}:
+            return False
+    return default
