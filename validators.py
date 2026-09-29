@@ -1,32 +1,40 @@
-class ValidationError(Exception):
-    """Custom exception for input validation failures."""
-    pass
+import re
+from typing import Any, Dict, Optional
 
-def validate_input(data: dict, required_keys: list):
+def validate_payload(data: Dict[str, Any]) -> bool:
     """
-    Ensures input dictionary contains all required keys and values.
-    Raises ValidationError if validation fails.
+    Validates core input structure for processing loop.
+    Ensures required fields exist and match expected types.
+    """
+    required_fields = {'id': int, 'payload': str, 'timestamp': float}
+
+    for field, field_type in required_fields.items():
+        if field not in data:
+            return False
+        if not isinstance(data[field], field_type):
+            return False
+
+    # Validate payload format constraint
+    if not re.match(r'^[a-zA-Z0-9_]{5,50}$', data['payload']):
+        return False
+
+    return True
+
+def sanitize_input(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Sanitizes dictionary values by stripping whitespace from strings.
+    """
+    return {k: (v.strip() if isinstance(v, str) else v) for k, v in data.items()}
+
+def process_safe(data: Any, handler_func: callable) -> Optional[Any]:
+    """
+    Orchestrates validation and sanitization before execution.
     """
     if not isinstance(data, dict):
-        raise ValidationError("input must be a dictionary")
-
-    for key in required_keys:
-        if key not in data:
-            raise ValidationError(f"missing required key: {key}")
-        if data[key] is None:
-            raise ValidationError(f"value for {key} cannot be null")
-
-def process_data(data: dict):
-    """
-    Main processing loop entry point with validation.
-    """
-    required = ["id", "payload"]
-    try:
-        validate_input(data, required)
-        # Logic for processing valid data
-        result = f"processed_{data['id']}"
-        return result
-    except ValidationError as e:
-        # Log error and return failure status
-        print(f"Validation failed: {e}")
         return None
+
+    cleaned = sanitize_input(data)
+    if not validate_payload(cleaned):
+        return None
+
+    return handler_func(cleaned)
