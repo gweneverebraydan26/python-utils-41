@@ -1,33 +1,36 @@
-import os
-import json
-from typing import Any, Optional
+import functools
+import time
+from typing import Callable, Any, Dict
 
-def ensure_dir(path: str) -> None:
-    """Creates directory if it does not exist."""
-    if not os.path.exists(path):
-        os.makedirs(path)
+# Cache for computed results to avoid redundant calculations
+_memoization_cache: Dict[tuple, Any] = {}
 
-def load_json(filepath: str) -> Any:
-    """Safely loads JSON from a file."""
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return None
+def memoize(func: Callable) -> Callable:
+    """Decorator for performance optimization via result caching."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs) -> Any:
+        key = (func.__name__, args, frozenset(kwargs.items()))
+        if key not in _memoization_cache:
+            _memoization_cache[key] = func(*args, **kwargs)
+        return _memoization_cache[key]
+    return wrapper
 
-def save_json(filepath: str, data: Any) -> None:
-    """Writes data to a JSON file."""
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=4)
+def batch_process(items: list, batch_size: int = 100) -> list:
+    """Efficient generator for chunked data processing."""
+    for i in range(0, len(items), batch_size):
+        yield items[i:i + batch_size]
 
-def get_env(key: str, default: Optional[str] = None) -> Optional[str]:
-    """Fetches environment variable with fallback."""
-    return os.environ.get(key, default)
+def timed_execution(func: Callable) -> Callable:
+    """Decorator for monitoring function execution time."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs) -> Any:
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        duration = time.perf_counter() - start_time
+        print(f"Execution of {func.__name__} took {duration:.4f} seconds")
+        return result
+    return wrapper
 
-def flatten_list(nested_list: list) -> list:
-    """Flattens a list of lists into a single list."""
-    return [item for sublist in nested_list for item in sublist]
-
-def chunk_list(data: list, size: int) -> list:
-    """Splits a list into smaller chunks."""
-    return [data[i:i + size] for i in range(0, len(data), size)]
+def clear_cache() -> None:
+    """Manual reset for memoization storage."""
+    _memoization_cache.clear()
