@@ -1,56 +1,26 @@
 import logging
-import os
-from logging.handlers import RotatingFileHandler
+import sys
 from typing import Optional
 
-def get_rotated_logger(
-    name: str,
-    log_file: str,
-    max_bytes: int = 10485760,  # 10 MB
-    backup_count: int = 5,
-    level: int = logging.INFO,
-    console_output: bool = True
-) -> logging.Logger:
-    """
-    Configures and returns a logger with a rotating file handler and optional console output.
-    
-    Ensures log directories exist and avoids duplicating handlers if the logger
-    is already initialized.
-    """
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
+class AppLogger:
+    def __init__(self, name: str = 'python-utils-41', level: int = logging.INFO):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(level)
+        self._setup_handler()
 
-    # Prevent handler duplication
-    if logger.handlers:
-        return logger
+    def _setup_handler(self) -> None:
+        """Configure console output format and handler."""
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        handler.setFormatter(formatter)
+        if not self.logger.handlers:
+            self.logger.addHandler(handler)
 
-    # Standard log format
-    formatter = logging.Formatter(
-        fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
+    def get_logger(self) -> logging.Logger:
+        return self.logger
 
-    # Create directory for log files if it does not exist
-    log_dir = os.path.dirname(log_file)
-    if log_dir:
-        os.makedirs(log_dir, exist_ok=True)
-
-    # Set up rotating file handler
-    file_handler = RotatingFileHandler(
-        filename=log_file,
-        maxBytes=max_bytes,
-        backupCount=backup_count,
-        encoding="utf-8"
-    )
-    file_handler.setFormatter(formatter)
-    file_handler.setLevel(level)
-    logger.addHandler(file_handler)
-
-    # Optionally add standard output stream handler
-    if console_output:
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
-        console_handler.setLevel(level)
-        logger.addHandler(console_handler)
-
-    return logger
+def get_default_logger(name: Optional[str] = None) -> logging.Logger:
+    """Factory function for standard application logging."""
+    return AppLogger(name or 'python-utils-41').get_logger()
