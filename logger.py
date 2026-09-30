@@ -1,26 +1,33 @@
 import logging
-import sys
-from typing import Optional
+from logging.handlers import RotatingFileHandler
+import os
 
-class AppLogger:
-    def __init__(self, name: str = 'python-utils-41', level: int = logging.INFO):
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(level)
-        self._setup_handler()
+def setup_logger(name: str, log_file: str = "app.log", level: int = logging.INFO):
+    """Configures a rotating file logger for the application."""
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
 
-    def _setup_handler(self) -> None:
-        """Configure console output format and handler."""
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        handler.setFormatter(formatter)
-        if not self.logger.handlers:
-            self.logger.addHandler(handler)
+    # Ensure directory exists
+    log_dir = os.path.dirname(log_file)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir)
 
-    def get_logger(self) -> logging.Logger:
-        return self.logger
+    # Setup rotating file handler: 5MB per file, keep 3 backups
+    handler = RotatingFileHandler(
+        log_file, 
+        maxBytes=5 * 1024 * 1024, 
+        backupCount=3
+    )
 
-def get_default_logger(name: Optional[str] = None) -> logging.Logger:
-    """Factory function for standard application logging."""
-    return AppLogger(name or 'python-utils-41').get_logger()
+    # Set message formatting
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    handler.setFormatter(formatter)
+
+    # Prevent duplicate handlers if re-initialized
+    if not logger.handlers:
+        logger.addHandler(handler)
+        logger.addHandler(logging.StreamHandler())
+
+    return logger
