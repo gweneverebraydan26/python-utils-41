@@ -1,39 +1,36 @@
-"""Global constant definitions for python-utils-41 application."""
+from typing import Final, Dict, List
 
-import os
-from enum import Enum
-from typing import Final
+# Application-wide configuration constants
 
-# Application Metadata
-APP_NAME: Final[str] = "python-utils-41"
-APP_VERSION: Final[str] = "1.4.0"
+DEFAULT_TIMEOUT: Final[int] = 30
+MAX_RETRIES: Final[int] = 3
 
-# Default Timeout & Retry Configurations
-DEFAULT_TIMEOUT_SECONDS: Final[int] = 30
-DEFAULT_MAX_RETRIES: Final[int] = 3
-DEFAULT_BACKOFF_FACTOR: Final[float] = 1.5
+SUPPORTED_ENCODINGS: Final[List[str]] = ['utf-8', 'ascii', 'latin-1']
 
-# File and Data Buffering Limits
-MAX_FILE_SIZE_BYTES: Final[int] = 10 * 1024 * 1024  # 10 MB
-DEFAULT_CHUNK_SIZE: Final[int] = 8192  # 8 KB
+ERROR_MESSAGES: Final[Dict[int, str]] = {
+    400: 'bad request syntax',
+    401: 'unauthorized access attempt',
+    403: 'forbidden resource access',
+    404: 'resource not found',
+    500: 'internal server error'
+}
 
-# Status Enums
-class ProcessingStatus(str, Enum):
-    """Standardized processing lifecycle status flags."""
-    PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    SKIPPED = "skipped"
+def get_error_message(status_code: int) -> str:
+    """
+    Retrieve a human-readable message for a given HTTP status code.
 
-# Common Regex Patterns
-EMAIL_REGEX_PATTERN: Final[str] = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
-SLUG_REGEX_PATTERN: Final[str] = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    Args:
+        status_code: The integer status code to look up.
 
-# Environment Defaults Helper
-def get_env_bool(key: str, default: bool = False) -> bool:
-    """Parse environment variable into boolean flag safely."""
-    val = os.getenv(key)
-    if val is None:
-        return default
-    return val.strip().lower() in ("true", "1", "yes", "on")
+    Returns:
+        A string description of the error or a generic message if unknown.
+    """
+    return ERROR_MESSAGES.get(status_code, 'unknown error occurred')
+
+class ConfigDefaults:
+    """
+    Namespace for nested configuration default settings.
+    """
+    LOG_LEVEL: Final[str] = 'INFO'
+    BATCH_SIZE: Final[int] = 100
+    ENABLE_DEBUG: Final[bool] = False
