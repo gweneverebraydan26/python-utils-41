@@ -1,48 +1,44 @@
 import json
 import os
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Dict, Optional, Union
+
 
 class ConfigLoader:
-    """Manages application configuration with defaults and environmental overrides."""
+    """Utility for loading configuration files with default fallbacks."""
 
-    def __init__(self, defaults: Dict[str, Any]):
-        self._defaults = defaults
-        self._config = defaults.copy()
+    def __init__(self, defaults: Optional[Dict[str, Any]] = None):
+        self.defaults = defaults or {}
 
-    def load_from_dict(self, data: Dict[str, Any]) -> None:
-        """Merges configuration updates from a dictionary."""
-        for key, value in data.items():
-            if isinstance(value, dict) and isinstance(self._config.get(key), dict):
-                self._config[key] = {**self._config[key], **value}
+    def _deep_merge(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+        """Recursively merge override dictionary into base dictionary."""
+        merged = base.copy()
+        for key, value in override.items():
+            if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+                merged[key] = self._deep_merge(merged[key], value)
             else:
-                self._config[key] = value
+                merged[key] = value
+        return merged
 
-    def load_from_json(self, filepath: str) -> bool:
-        """Loads configuration from a JSON file if it exists."""
-        if not os.path.exists(filepath):
-            return False
-        with open(filepath, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            self.load_from_dict(data)
-        return True
+    def load_from_json(self, filepath: Union[str, Path]) -> Dict[str, Any]:
+        """Load configuration from a JSON file, applying default values."""
+        config_path = Path(filepath)
+        if not config_path.exists():
+            return self.defaults.copy()
 
-    def load_from_env(self, prefix: str = "APP_") -> None:
-        """Overrides existing configuration using matching environment variables."""
-        for key in list(self._config.keys()):
-            env_key = f"{prefix}{key.upper()}"
-            if env_key in os.environ:
-                raw_val = os.environ[env_key]
-                try:
-                    # Try parsing env value as JSON (handles bools, numbers, lists)
-                    self._config[key] = json.loads(raw_val)
-                except json.JSONDecodeError:
-                    self._config[key] = raw_val
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                file_config = json.load(f)
+        except (json.JSONDecodeError, OSError) as err:
+            raise ValueError(f"Failed to parse config file '{filepath}': {err}")
 
-    def get(self, key: str, default: Any = None) -> Any:
-        """Retrieves a configuration value by key."""
-        return self._config.get(key, default)
+        return self._deep_merge(self.defaults, file_config)
 
-    @property
-    def data(self) -> Dict[str, Any]:
-        """Returns the resolved configuration dictionary."""
-        return self._config
+    def load_from_env(self, prefix: str = "APP_") -> Dict[str, Any]:
+        """Extract environment variables matching a prefix into a dictionary."""
+        env_config: Dict[str, Any] = {}
+        for key, value in os.environ.items():
+            if key.startswith(prefix):
+                config_key = key[len(prefix):].lower()
+                env_config[config_key] = value
+        return self._deep_merge(self.defaults, env_config)
