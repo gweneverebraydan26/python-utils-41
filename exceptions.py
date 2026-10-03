@@ -1,26 +1,36 @@
-from typing import Optional, Any
-
-class UtilsError(Exception):
-    """Base exception for python-utils-41 package."""
-    def __init__(self, message: str, code: Optional[int] = None) -> None:
-        super().__init__(message)
-        self.code = code
-
-class ConfigurationError(UtilsError):
-    """Raised when utility configuration is invalid."""
+class ValidationError(Exception):
+    """Custom exception for input validation failures."""
     pass
 
-class ProcessingError(UtilsError):
-    """Raised when data processing encounters an error."""
-    def __init__(self, message: str, context: Optional[Any] = None) -> None:
-        super().__init__(message)
-        self.context = context
+def validate_input(data, schema):
+    """
+    Validates dictionary input against expected keys and types.
+    
+    Args:
+        data: The input dictionary to validate.
+        schema: A dict mapping keys to expected types.
+    
+    Raises:
+        ValidationError: If key is missing or type mismatch occurs.
+    """
+    if not isinstance(data, dict):
+        raise ValidationError("Input must be a dictionary")
 
-def raise_if_none(value: Any, name: str) -> None:
-    """Validate that a variable is not None, or raise ConfigurationError."""
-    if value is None:
-        raise ConfigurationError(f"Variable '{name}' must not be None")
+    for key, expected_type in schema.items():
+        if key not in data:
+            raise ValidationError(f"Missing required key: {key}")
+        if not isinstance(data[key], expected_type):
+            raise ValidationError(f"Key {key} expects {expected_type.__name__}")
 
-def format_exception(exc: Exception) -> str:
-    """Convert an exception object into a readable string."""
-    return f"{type(exc).__name__}: {str(exc)}"
+def process_data(payload):
+    """
+    Main processing loop entry point with validation.
+    """
+    schema = {"id": int, "value": str}
+    try:
+        validate_input(payload, schema)
+        # Process logic goes here
+        return True
+    except ValidationError as e:
+        print(f"Validation failed: {e}")
+        return False
