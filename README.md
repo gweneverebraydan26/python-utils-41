@@ -1,48 +1,45 @@
 # python-utils-41
 
-A collection of lightweight, high-performance Python utilities designed to streamline common development tasks. This library focuses on reducing boilerplate code for file operations, data validation, and asynchronous task management.
+A collection of lightweight, high-performance Python utilities designed to streamline common data processing and system automation tasks. This library focuses on efficiency and developer ergonomics to minimize boilerplate in daily scripting workflows.
 
 ## Features
 
-*   **Robust File I/O:** Simplified wrappers for rapid directory traversal, pattern-based file searching, and atomic JSON serialization.
-*   **Data Validation:** A lightweight set of decorators for schema validation and type-checking, minimizing runtime errors in production.
-*   **Async Helpers:** Intuitive utility functions for batching asynchronous tasks and managing concurrent subprocesses with ease.
-*   **String Formatting:** Optimized patterns for common data sanitization tasks, including slug generation and complex delimiter parsing.
+*   **Robust File Operations:** Advanced context managers for safe atomic file writes and recursive directory synchronization.
+*   **Performance Decorators:** Pre-built timing and caching decorators to identify bottlenecks and optimize function execution speeds.
+*   **Object Transformation:** Utility methods for deep-merging dictionaries and flattening complex nested data structures.
+*   **Logging Enhancements:** Standardized formatting wrappers that enable multi-stream logging with color-coded severity levels out of the box.
 
 ## Installation
 
-Install the package directly via pip:
+Install the package directly from PyPI using pip:
 
 ```bash
 pip install python-utils-41
 ```
 
-Or add it to your `requirements.txt`:
+To install from source for local development:
 
-```text
-python-utils-41>=1.0.0
+```bash
+git clone https://github.com/Developer/python-utils-41.git
+cd python-utils-41
+pip install -e .
 ```
 
 ## Usage
 
-Here is a quick example demonstrating how to use the file-caching utility to handle JSON storage:
+Here is a quick example of how to use the built-in execution timer to monitor function performance:
 
 ```python
-from pyutils41.io import json_cache
+from pyutils41.decorators import time_execution
 
-# Decorate a function to automatically cache output to a file
-@json_cache(filename="data.json", ttl=3600)
-def fetch_external_data():
-    return {"status": "success", "payload": [1, 2, 3]}
+@time_execution
+def process_data(payload):
+    # Simulate heavy computation
+    return [i * 2 for i in payload]
 
-# The first call fetches data, subsequent calls within an hour load from disk
-data = fetch_external_data()
-print(data['status'])
+result = process_data(range(1000000))
+# Output: [Function: process_data] took 0.045s to execute.
 ```
-
-## Contributing
-
-We welcome contributions! Please open an issue for feature requests or submit a pull request for bug fixes. Ensure all new code includes corresponding tests in the `tests/` directory.
 
 ## License
 
