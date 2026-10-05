@@ -1,36 +1,24 @@
-class ValidationError(Exception):
-    """Custom exception for input validation failures."""
+class UtilityError(Exception):
+    """Base exception for python-utils-41"""
     pass
 
-def validate_input(data, schema):
-    """
-    Validates dictionary input against expected keys and types.
-    
-    Args:
-        data: The input dictionary to validate.
-        schema: A dict mapping keys to expected types.
-    
-    Raises:
-        ValidationError: If key is missing or type mismatch occurs.
-    """
-    if not isinstance(data, dict):
-        raise ValidationError("Input must be a dictionary")
+class DataProcessingError(UtilityError):
+    """Raised when data transformation fails"""
+    pass
 
-    for key, expected_type in schema.items():
-        if key not in data:
-            raise ValidationError(f"Missing required key: {key}")
-        if not isinstance(data[key], expected_type):
-            raise ValidationError(f"Key {key} expects {expected_type.__name__}")
+class ValidationError(UtilityError):
+    """Raised when data validation fails"""
+    pass
 
-def process_data(payload):
-    """
-    Main processing loop entry point with validation.
-    """
-    schema = {"id": int, "value": str}
+def raise_if_invalid(data: dict, schema: list) -> None:
+    """Validates dictionary keys against schema list"""
+    missing = [key for key in schema if key not in data]
+    if missing:
+        raise ValidationError(f"Missing required keys: {', '.join(missing)}")
+
+def safe_extract(data: dict, key: str, default=None):
+    """Safe key retrieval from nested dictionaries"""
     try:
-        validate_input(payload, schema)
-        # Process logic goes here
-        return True
-    except ValidationError as e:
-        print(f"Validation failed: {e}")
-        return False
+        return data.get(key, default)
+    except AttributeError:
+        raise DataProcessingError(f"Invalid data format: expected dict, got {type(data).__name__}")
