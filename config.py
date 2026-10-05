@@ -1,44 +1,62 @@
-import json
 import os
-from pathlib import Path
-from typing import Any, Dict, Optional, Union
+import json
+from typing import Any, Dict, Optional, Type, TypeVar
 
+T = TypeVar('T')
 
-class ConfigLoader:
-    """Utility for loading configuration files with default fallbacks."""
+class ConfigError(Exception):
+    """Custom exception raised for configuration validation errors."""
+    pass
 
-    def __init__(self, defaults: Optional[Dict[str, Any]] = None):
-        self.defaults = defaults or {}
+class SafeConfig:
+    """A utility to safely extract and cast configuration values from env or dict."""
 
-    def _deep_merge(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
-        """Recursively merge override dictionary into base dictionary."""
-        merged = base.copy()
-        for key, value in override.items():
-            if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
-                merged[key] = self._deep_merge(merged[key], value)
-            else:
-                merged[key] = value
-        return merged
+    def __init__(self, data: Optional[Dict[str, Any]] = None):
+        self._data = data or {}
 
-    def load_from_json(self, filepath: Union[str, Path]) -> Dict[str, Any]:
-        """Load configuration from a JSON file, applying default values."""
-        config_path = Path(filepath)
-        if not config_path.exists():
-            return self.defaults.copy()
+    def get_as_type(self, key: str, expected_type: Type[T], default: Optional[T] = None) -> T:
+        """
+        Retrieve a config value and cast it to the expected type.
+        Handles edge cases like boolean strings, malformed JSON, and numeric casting.
+        """
+        value = self._data.get(key)
+
+        if value is None:
+            value = os.environ.get(key)
+
+        if value is None:
+            if default is not None:
+                return default
+            raise ConfigError(f"Missing required configuration key: '{key}'")
+
+        if expected_type is bool:
+            if isinstance(value, str):
+                normalized = value.strip().lower()
+                if normalized in ('true', '1', 'yes', 'on'):
+                    return True  # type: ignore
+                if normalized in ('false', '0', 'no', 'off'):
+                    return False  # type: ignore
+                raise ConfigError(f"Cannot cast value '{value}' for key '{key}' to boolean")
+            return bool(value)  # type: ignore
 
         try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                file_config = json.load(f)
-        except (json.JSONDecodeError, OSError) as err:
-            raise ValueError(f"Failed to parse config file '{filepath}': {err}")
+            if expected_type in (int, float):
+                return expected_type(value)  # type: ignore
 
-        return self._deep_merge(self.defaults, file_config)
+            if expected_type in (list, dict) and isinstance(value, str):
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, expected_type):
+                        return parsed
+                except json.JSONDecodeError as err:
+                    raise ConfigError(f"Failed to parse JSON structure for key '{key}': {err}") from err
 
-    def load_from_env(self, prefix: str = "APP_") -> Dict[str, Any]:
-        """Extract environment variables matching a prefix into a dictionary."""
-        env_config: Dict[str, Any] = {}
-        for key, value in os.environ.items():
-            if key.startswith(prefix):
-                config_key = key[len(prefix):].lower()
-                env_config[config_key] = value
-        return self._deep_merge(self.defaults, env_config)
+            if not isinstance(value, expected_type):
+                return expected_type(value)  # type: ignore
+
+            return value
+        except (ValueError, TypeError) as err:
+            raise ConfigError(
+                f"Type conversion failed for key '{key}'. "
+                f"Expected {expected_type.__name__}, got value '{value}'"
+            ) from err
