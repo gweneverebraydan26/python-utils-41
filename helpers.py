@@ -1,35 +1,35 @@
 import json
-import logging
-from typing import Any, Dict, Optional
+import os
+from typing import Any, Dict
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+def load_config(path: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
+    """Loads JSON config file and merges with provided defaults."""
+    config = defaults.copy()
+    
+    if not os.path.exists(path):
+        return config
 
-def safe_json_load(data: str, default: Any = None) -> Any:
-    """Parse json string with fallback to default."""
     try:
-        return json.loads(data)
-    except (json.JSONDecodeError, TypeError):
-        return default
+        with open(path, 'r') as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                config.update(data)
+    except (json.JSONDecodeError, IOError):
+        pass
+        
+    return config
 
-def get_nested(data: Dict, path: str, default: Any = None) -> Any:
-    """Access nested dictionary values using dot notation."""
-    keys = path.split('.')
-    current = data
-    for key in keys:
-        if isinstance(current, dict) and key in current:
-            current = current[key]
-        else:
-            return default
-    return current
+def get_env_var(key: str, default: str) -> str:
+    """Retrieves environment variable with fallback."""
+    return os.environ.get(key, default)
 
-def chunk_list(items: list, size: int):
-    """Split a list into chunks of a given size."""
-    if size <= 0:
-        raise ValueError("chunk size must be positive")
-    for i in range(0, len(items), size):
-        yield items[i:i + size]
-
-def sanitize_dict(data: Dict) -> Dict:
-    """Remove keys with None values from dictionary."""
-    return {k: v for k, v in data.items() if v is not None}
+# Usage example for configuration management
+if __name__ == "__main__":
+    default_settings = {
+        "host": "127.0.0.1",
+        "port": 8080,
+        "debug": False
+    }
+    
+    settings = load_config("config.json", default_settings)
+    print(f"Loaded settings: {settings}")
