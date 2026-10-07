@@ -1,28 +1,27 @@
-from typing import Any, Dict, List, Union
-import collections.abc
+from typing import List, Any, Optional
 
-def flatten_dict(d: Dict[str, Any], parent_key: str = '', sep: str = '_') -> Dict[str, Any]:
-    """Flattens a nested dictionary into a single level."""
-    items = []
-    for k, v in d.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, collections.abc.MutableMapping):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
+def flatten_list(nested_list: List[Any]) -> List[Any]:
+    """Recursively flatten a nested list structure into a single list."""
+    flat: List[Any] = []
+    for item in nested_list:
+        if isinstance(item, list):
+            flat.extend(flatten_list(item))
         else:
-            items.append((new_key, v))
-    return dict(items)
+            flat.append(item)
+    return flat
 
-def chunk_list(data: List[Any], size: int) -> List[List[Any]]:
-    """Splits a list into smaller chunks of a fixed size."""
+def get_nested_value(data: dict, keys: List[str], default: Any = None) -> Any:
+    """Retrieve a value from a nested dictionary using a list of keys."""
+    current = data
+    try:
+        for key in keys:
+            current = current[key]
+        return current
+    except (KeyError, TypeError):
+        return default
+
+def chunk_iterable(items: List[Any], size: int) -> List[List[Any]]:
+    """Split a list into smaller chunks of a specified size."""
     if size <= 0:
-        raise ValueError("Chunk size must be positive")
-    return [data[i:i + size] for i in range(0, len(data), size)]
-
-def safe_get(data: Dict[str, Any], keys: str, default: Any = None) -> Any:
-    """Retrieves nested dictionary values using dot notation."""
-    for key in keys.split('.'):
-        if isinstance(data, dict):
-            data = data.get(key, default)
-        else:
-            return default
-    return data
+        raise ValueError("chunk size must be positive")
+    return [items[i:i + size] for i in range(0, len(items), size)]
