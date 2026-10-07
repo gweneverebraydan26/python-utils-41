@@ -1,47 +1,28 @@
-import functools
-import time
-from typing import Callable, Any, Dict
+import json
+import os
+from typing import Any, Optional
 
-# internal cache for repetitive expensive operations
-_memoization_cache: Dict[tuple, Any] = {}
+def load_json(file_path: str) -> dict:
+    """Safely load and parse a JSON file."""
+    if not os.path.exists(file_path):
+        return {}
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
-def lru_memoize(max_size: int = 128) -> Callable:
-    """Decorator for caching function results to improve throughput."""
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            key = (func.__name__, args, frozenset(kwargs.items()))
-            if key in _memoization_cache:
-                return _memoization_cache[key]
-            
-            result = func(*args, **kwargs)
-            
-            if len(_memoization_cache) >= max_size:
-                _memoization_cache.clear()
-                
-            _memoization_cache[key] = result
-            return result
-        return wrapper
-    return decorator
+def save_json(data: dict, file_path: str) -> None:
+    """Serialize data to a JSON file."""
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4)
 
-class DataHandler:
-    def __init__(self, buffer_size: int = 1000):
-        self.buffer = []
-        self.buffer_size = buffer_size
+def get_env_var(key: str, default: Optional[Any] = None) -> Any:
+    """Retrieve environment variable with default fallback."""
+    return os.environ.get(key, default)
 
-    def process_batch(self, data: list) -> list:
-        """Batch processing optimization to reduce overhead."""
-        if not data:
-            return []
-        
-        # pre-allocation logic for performance
-        processed = [None] * len(data)
-        for i, item in enumerate(data):
-            processed[i] = self._transform(item)
-        return processed
+def chunk_list(data: list, size: int):
+    """Split a list into chunks of defined size."""
+    for i in range(0, len(data), size):
+        yield data[i:i + size]
 
-    @lru_memoize(max_size=256)
-    def _transform(self, item: Any) -> Any:
-        """Heavy computation logic optimized with memoization."""
-        time.sleep(0.01)  # simulating intensive workload
-        return hash(str(item))
+def sanitize_path(path: str) -> str:
+    """Normalize and clean file path strings."""
+    return os.path.normpath(path.strip())
