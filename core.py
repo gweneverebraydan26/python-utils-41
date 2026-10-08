@@ -1,34 +1,32 @@
-import functools
-import time
-from typing import Callable, Any, Dict
+import collections.abc
+from itertools import islice
+from typing import Iterable, Iterator, Any, Generator
 
-# global cache for heavy computation results
-_CACHE: Dict[tuple, Any] = {}
+def chunked(iterable: Iterable[Any], size: int) -> Generator[list[Any], None, None]:
+    """Break an iterable into lists of a given size without loading everything."""
+    if size < 1:
+        raise ValueError("Chunk size must be at least 1")
+    iterator = iter(iterable)
+    while True:
+        chunk = list(islice(iterator, size))
+        if not chunk:
+            break
+        yield chunk
 
-def memoize(func: Callable) -> Callable:
-    """decorator for caching expensive function calls"""
-    @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        key = (func.__name__, args, frozenset(kwargs.items()))
-        if key not in _CACHE:
-            _CACHE[key] = func(*args, **kwargs)
-        return _CACHE[key]
-    return wrapper
+def fast_flatten(iterable: Iterable[Any]) -> Generator[Any, None, None]:
+    """Flatten deeply nested iterables iteratively to optimize memory and speed.
 
-def batch_process(data: list, chunk_size: int = 1000):
-    """generator for memory-efficient data chunking"""
-    for i in range(0, len(data), chunk_size):
-        yield data[i:i + chunk_size]
-
-class PerformanceTracker:
-    """context manager for execution time profiling"""
-    def __init__(self, label: str):
-        self.label = label
-
-    def __enter__(self):
-        self.start = time.perf_counter()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        elapsed = time.perf_counter() - self.start
-        print(f"[{self.label}] execution time: {elapsed:.6f}s")
+    Avoids recursion limits by using an internal stack.
+    """
+    stack = [iter(iterable)]
+    while stack:
+        try:
+            item = next(stack[-1])
+            if isinstance(item, (str, bytes)):
+                yield item
+            elif isinstance(item, collections.abc.Iterable):
+                stack.append(iter(item))
+            else:
+                yield item
+        except StopIteration:
+            stack.pop()
