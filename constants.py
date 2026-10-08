@@ -1,36 +1,32 @@
-from typing import Final, Dict, List
+import os
+import logging
+from typing import Final
 
-# Application-wide configuration constants
-
-DEFAULT_TIMEOUT: Final[int] = 30
+# Application configuration defaults
+DEFAULT_ENCODING: Final[str] = 'utf-8'
+CHUNK_SIZE: Final[int] = 8192
 MAX_RETRIES: Final[int] = 3
 
-SUPPORTED_ENCODINGS: Final[List[str]] = ['utf-8', 'ascii', 'latin-1']
+# Environment-based paths with fallback
+BASE_DIR: Final[str] = os.path.dirname(os.path.abspath(__file__))
+LOG_DIR: Final[str] = os.getenv('LOG_DIR', os.path.join(BASE_DIR, 'logs'))
 
-ERROR_MESSAGES: Final[Dict[int, str]] = {
-    400: 'bad request syntax',
-    401: 'unauthorized access attempt',
-    403: 'forbidden resource access',
-    404: 'resource not found',
-    500: 'internal server error'
-}
+# Standardized date/time formats
+ISO_DATETIME_FORMAT: Final[str] = '%Y-%m-%dT%H:%M:%S%z'
+FILE_DATE_FORMAT: Final[str] = '%Y%m%d_%H%M%S'
 
-def get_error_message(status_code: int) -> str:
-    """
-    Retrieve a human-readable message for a given HTTP status code.
+# Logging configuration defaults
+LOG_LEVEL: Final[int] = logging.INFO
+LOG_FORMAT: Final[str] = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
-    Args:
-        status_code: The integer status code to look up.
+# Timeout settings in seconds
+DEFAULT_TIMEOUT: Final[float] = 30.0
+HTTP_READ_TIMEOUT: Final[float] = 10.0
 
-    Returns:
-        A string description of the error or a generic message if unknown.
-    """
-    return ERROR_MESSAGES.get(status_code, 'unknown error occurred')
+# Supported file extensions for processing
+SUPPORTED_EXTENSIONS: Final[tuple[str, ...]] = ('.json', '.yaml', '.txt', '.csv')
 
-class ConfigDefaults:
-    """
-    Namespace for nested configuration default settings.
-    """
-    LOG_LEVEL: Final[str] = 'INFO'
-    BATCH_SIZE: Final[int] = 100
-    ENABLE_DEBUG: Final[bool] = False
+# Environment identifiers
+ENV_PRODUCTION: Final[str] = 'production'
+ENV_DEVELOPMENT: Final[str] = 'development'
+ENV_TESTING: Final[str] = 'testing'
