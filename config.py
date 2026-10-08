@@ -1,62 +1,37 @@
-import os
-import json
-from typing import Any, Dict, Optional, Type, TypeVar
+import functools
+import logging
+from typing import Any, Callable
 
-T = TypeVar('T')
+# global registry for cached configuration values
+_CONFIG_CACHE = {}
 
-class ConfigError(Exception):
-    """Custom exception raised for configuration validation errors."""
-    pass
+class ConfigManager:
+    """Thread-safe configuration accessor with memoization."""
 
-class SafeConfig:
-    """A utility to safely extract and cast configuration values from env or dict."""
+    def __init__(self) -> None:
+        self._settings = {}
 
-    def __init__(self, data: Optional[Dict[str, Any]] = None):
-        self._data = data or {}
+    @functools.lru_cache(maxsize=128)
+    def get_setting(self, key: str, default: Any = None) -> Any:
+        """retrieve setting value with lru_cache performance boost."""
+        return self._settings.get(key, default)
 
-    def get_as_type(self, key: str, expected_type: Type[T], default: Optional[T] = None) -> T:
-        """
-        Retrieve a config value and cast it to the expected type.
-        Handles edge cases like boolean strings, malformed JSON, and numeric casting.
-        """
-        value = self._data.get(key)
+    def update_setting(self, key: str, value: Any) -> None:
+        """update setting and clear specific cache entries."""
+        self._settings[key] = value
+        self.get_setting.cache_clear()
 
-        if value is None:
-            value = os.environ.get(key)
+    def bulk_load(self, data: dict) -> None:
+        """bulk update for dictionary configurations."""
+        self._settings.update(data)
+        self.get_setting.cache_clear()
 
-        if value is None:
-            if default is not None:
-                return default
-            raise ConfigError(f"Missing required configuration key: '{key}'")
-
-        if expected_type is bool:
-            if isinstance(value, str):
-                normalized = value.strip().lower()
-                if normalized in ('true', '1', 'yes', 'on'):
-                    return True  # type: ignore
-                if normalized in ('false', '0', 'no', 'off'):
-                    return False  # type: ignore
-                raise ConfigError(f"Cannot cast value '{value}' for key '{key}' to boolean")
-            return bool(value)  # type: ignore
-
-        try:
-            if expected_type in (int, float):
-                return expected_type(value)  # type: ignore
-
-            if expected_type in (list, dict) and isinstance(value, str):
-                try:
-                    parsed = json.loads(value)
-                    if isinstance(parsed, expected_type):
-                        return parsed
-                except json.JSONDecodeError as err:
-                    raise ConfigError(f"Failed to parse JSON structure for key '{key}': {err}") from err
-
-            if not isinstance(value, expected_type):
-                return expected_type(value)  # type: ignore
-
-            return value
-        except (ValueError, TypeError) as err:
-            raise ConfigError(
-                f"Type conversion failed for key '{key}'. "
-                f"Expected {expected_type.__name__}, got value '{value}'"
-            ) from err
+def memoized_config(func: Callable) -> Callable:
+    """decorator for expensive configuration lookup methods."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        key = (func.__name__, str(args), str(kwargs))
+        if key not in _CONFIG_CACHE:
+            _CONFIG_CACHE[key] = func(*args, **kwargs)
+        return _CONFIG_CACHE[key]
+    return wrapper
