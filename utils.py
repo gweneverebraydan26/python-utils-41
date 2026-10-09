@@ -1,27 +1,38 @@
-from typing import List, Any, Optional
+import logging
+from typing import Any, Optional, Union
 
-def flatten_list(nested_list: List[Any]) -> List[Any]:
-    """Recursively flatten a nested list structure into a single list."""
-    flat: List[Any] = []
-    for item in nested_list:
-        if isinstance(item, list):
-            flat.extend(flatten_list(item))
-        else:
-            flat.append(item)
-    return flat
+logger = logging.getLogger(__name__)
 
-def get_nested_value(data: dict, keys: List[str], default: Any = None) -> Any:
-    """Retrieve a value from a nested dictionary using a list of keys."""
+def safe_divide(a: Union[int, float], b: Union[int, float]) -> Optional[float]:
+    """Performs safe division with zero handling."""
+    try:
+        return float(a) / float(b)
+    except ZeroDivisionError:
+        logger.error("attempted division by zero")
+        return None
+    except (TypeError, ValueError):
+        logger.error("invalid non-numeric input provided")
+        return None
+
+def get_nested_key(data: dict, keys: list, default: Any = None) -> Any:
+    """Safely retrieves values from deep nested dictionary."""
+    if not isinstance(data, dict):
+        return default
+    
     current = data
     try:
         for key in keys:
+            if not isinstance(current, dict) or key not in current:
+                return default
             current = current[key]
         return current
-    except (KeyError, TypeError):
+    except Exception as e:
+        logger.error(f"unexpected lookup error: {e}")
         return default
 
-def chunk_iterable(items: List[Any], size: int) -> List[List[Any]]:
-    """Split a list into smaller chunks of a specified size."""
-    if size <= 0:
-        raise ValueError("chunk size must be positive")
-    return [items[i:i + size] for i in range(0, len(items), size)]
+def parse_int_safe(value: Any, fallback: int = 0) -> int:
+    """Converts input to int with robust fallbacks."""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return fallback
