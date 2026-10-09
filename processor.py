@@ -1,50 +1,38 @@
-from typing import Any, Dict, List, Optional
+import functools
+from typing import Any, Callable, Iterable, List, TypeVar
 
-def sanitize_data(data: Any, keys_to_strip: Optional[List[str]] = None) -> Any:
-    """
-    Recursively cleans input data by removing specified keys and normalizing strings.
-    """
-    if keys_to_strip is None:
-        keys_to_strip = []
+T = TypeVar("T")
+R = TypeVar("R")
 
-    if isinstance(data, dict):
-        return {
-            str(k): sanitize_data(v, keys_to_strip)
-            for k, v in data.items()
-            if k not in keys_to_strip
-        }
-    
-    elif isinstance(data, list):
-        return [sanitize_data(item, keys_to_strip) for item in data]
-    
-    elif isinstance(data, str):
-        return data.strip()
-    
-    return data
 
-def batch_process(items: List[Any], func: callable, batch_size: int = 10) -> List[Any]:
-    """
-    Executes a function across items in manageable chunks.
-    """
-    results = []
-    for i in range(0, len(items), batch_size):
-        batch = items[i : i + batch_size]
-        try:
-            results.extend([func(item) for item in batch])
-        except Exception as e:
-            print(f"Processing error at batch {i}: {e}")
-            continue
-    return results
+class BatchProcessor:
+    """Efficient batch processing pipeline with optimized chunking and memoization."""
 
-def get_nested(data: Dict, path: str, default: Any = None) -> Any:
-    """
-    Retrieves values from nested dictionary using dot notation.
-    """
-    keys = path.split('.')
-    current = data
-    try:
-        for key in keys:
-            current = current[key]
-        return current
-    except (KeyError, TypeError):
-        return default
+    def __init__(self, batch_size: int = 1000) -> None:
+        if batch_size <= 0:
+            raise ValueError("batch_size must be a positive integer")
+        self.batch_size = batch_size
+
+    def chunk_stream(self, items: Iterable[T]) -> Iterable[List[T]]:
+        """Yield successive chunks from an iterable to reduce memory overhead."""
+        chunk: List[T] = []
+        for item in items:
+            chunk.append(item)
+            if len(chunk) >= self.batch_size:
+                yield chunk
+                chunk = []
+        if chunk:
+            yield chunk
+
+    def process_batch(self, items: Iterable[T], transform: Callable[[T], R]) -> List[R]:
+        """Process items in batch streams applying transform efficiently."""
+        results: List[R] = []
+        for chunk in self.chunk_stream(items):
+            results.extend(map(transform, chunk))
+        return results
+
+
+@functools.lru_cache(maxsize=1024)
+def cached_transform(value: str) -> str:
+    """Cached string transformation for repeated lookups."""
+    return value.strip().lower()
