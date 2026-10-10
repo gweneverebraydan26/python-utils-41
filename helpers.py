@@ -1,35 +1,31 @@
-import json
-import os
-from typing import Any, Dict
+from typing import Any, Dict, List, Union
 
-def load_config(path: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
-    """Loads JSON config file and merges with provided defaults."""
-    config = defaults.copy()
-    
-    if not os.path.exists(path):
-        return config
+def flatten_dict(d: Dict[str, Any], parent_key: str = '', sep: str = '_') -> Dict[str, Any]:
+    """Flatten a nested dictionary with concatenated keys."""
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
 
-    try:
-        with open(path, 'r') as f:
-            data = json.load(f)
-            if isinstance(data, dict):
-                config.update(data)
-    except (json.JSONDecodeError, IOError):
-        pass
-        
-    return config
+def sanitize_list(data: List[Any]) -> List[Any]:
+    """Remove None values from a list."""
+    return [item for item in data if item is not None]
 
-def get_env_var(key: str, default: str) -> str:
-    """Retrieves environment variable with fallback."""
-    return os.environ.get(key, default)
+def chunk_data(data: List[Any], size: int) -> List[List[Any]]:
+    """Split a list into chunks of a given size."""
+    if size <= 0:
+        raise ValueError("Chunk size must be positive")
+    return [data[i:i + size] for i in range(0, len(data), size)]
 
-# Usage example for configuration management
-if __name__ == "__main__":
-    default_settings = {
-        "host": "127.0.0.1",
-        "port": 8080,
-        "debug": False
-    }
-    
-    settings = load_config("config.json", default_settings)
-    print(f"Loaded settings: {settings}")
+def safe_get(data: Dict[str, Any], keys: List[str], default: Any = None) -> Any:
+    """Access nested dictionary keys safely."""
+    for key in keys:
+        if isinstance(data, dict):
+            data = data.get(key, default)
+        else:
+            return default
+    return data
