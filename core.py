@@ -1,32 +1,42 @@
-import collections.abc
-from itertools import islice
-from typing import Iterable, Iterator, Any, Generator
+import functools
+import itertools
+from typing import Any, Callable, Iterable, List, TypeVar
 
-def chunked(iterable: Iterable[Any], size: int) -> Generator[list[Any], None, None]:
-    """Break an iterable into lists of a given size without loading everything."""
-    if size < 1:
-        raise ValueError("Chunk size must be at least 1")
-    iterator = iter(iterable)
-    while True:
-        chunk = list(islice(iterator, size))
-        if not chunk:
-            break
-        yield chunk
+T = TypeVar("T")
+R = TypeVar("R")
 
-def fast_flatten(iterable: Iterable[Any]) -> Generator[Any, None, None]:
-    """Flatten deeply nested iterables iteratively to optimize memory and speed.
 
-    Avoids recursion limits by using an internal stack.
-    """
-    stack = [iter(iterable)]
-    while stack:
-        try:
-            item = next(stack[-1])
-            if isinstance(item, (str, bytes)):
-                yield item
-            elif isinstance(item, collections.abc.Iterable):
-                stack.append(iter(item))
-            else:
-                yield item
-        except StopIteration:
-            stack.pop()
+class FastDataTransformer:
+    """Core utility for fast sequence transformation and memoized evaluation."""
+
+    __slots__ = ("_cache_size", "_transform_func")
+
+    def __init__(self, transform_func: Callable[[Any], Any], cache_size: int = 1024):
+        self._cache_size = cache_size
+        # Memoize transformation function to speed up lookups on duplicate inputs
+        self._transform_func = functools.lru_cache(maxsize=cache_size)(transform_func)
+
+    def process_item(self, item: Any) -> Any:
+        """Process a single item using the cached transformation logic."""
+        return self._transform_func(item)
+
+    def process_batch(self, items: Iterable[Any], chunk_size: int = 256) -> List[Any]:
+        """Process items in memory-efficient chunks to minimize allocation overhead."""
+        iterator = iter(items)
+        results = []
+
+        while True:
+            chunk = list(itertools.islice(iterator, chunk_size))
+            if not chunk:
+                break
+            results.extend(map(self._transform_func, chunk))
+
+        return results
+
+    def clear_cache(self) -> None:
+        """Reset internal memoization cache statistics."""
+        self._transform_func.cache_clear()
+
+    def cache_info(self) -> functools._CacheInfo:
+        """Return cache performance metrics for monitoring."""
+        return self._transform_func.cache_info()
