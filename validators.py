@@ -1,33 +1,39 @@
-import re
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 
-class DataValidator:
-    """Utility class for common data structure validation."""
+def validate_schema(data: Any, schema: Dict[str, type]) -> bool:
+    """
+    Validates that a dictionary matches the provided type schema.
+    Returns True if valid, False otherwise.
+    """
+    if not isinstance(data, dict):
+        return False
 
-    EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
-
-    @staticmethod
-    def is_valid_email(email: str) -> bool:
-        """Check if string is a valid email format."""
-        if not isinstance(email, str):
+    for key, expected_type in schema.items():
+        if key not in data:
             return False
-        return bool(DataValidator.EMAIL_REGEX.match(email))
+        if not isinstance(data[key], expected_type):
+            return False
+            
+    return True
 
-    @staticmethod
-    def validate_non_empty_string(value: Any) -> bool:
-        """Verify input is a non-empty string."""
-        return isinstance(value, str) and len(value.strip()) > 0
-
-    @staticmethod
-    def validate_range(value: int, min_val: int, max_val: int) -> bool:
-        """Ensure integer is within inclusive boundaries."""
-        return isinstance(value, int) and min_val <= value <= max_val
-
-def sanitize_input(data: str) -> str:
-    """Basic strip and cleaning for user input."""
-    if not isinstance(data, str):
+def sanitize_input(value: Any) -> str:
+    """
+    Converts any input into a stripped, safe string.
+    """
+    if value is None:
         return ""
-    return data.strip().replace("<", "&lt;").replace(">", "&gt;")
+    return str(value).strip()
 
-# Helper instances for cleaner access
-validator = DataValidator()
+def get_nested(data: Dict, path: str, default: Any = None) -> Any:
+    """
+    Retrieves nested dictionary values using dot notation.
+    Example: get_nested(data, 'user.profile.id')
+    """
+    keys = path.split('.')
+    current = data
+    try:
+        for key in keys:
+            current = current[key]
+        return current
+    except (KeyError, TypeError, AttributeError):
+        return default
