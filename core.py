@@ -1,42 +1,49 @@
-import functools
-import itertools
-from typing import Any, Callable, Iterable, List, TypeVar
+from typing import Any, Dict, List, Optional, Union
 
-T = TypeVar("T")
-R = TypeVar("R")
+def merge_configs(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively merges two configuration dictionaries.
 
+    Args:
+        base: The primary configuration dictionary.
+        override: The dictionary containing updates.
 
-class FastDataTransformer:
-    """Core utility for fast sequence transformation and memoized evaluation."""
+    Returns:
+        A new dictionary with merged values.
+    """
+    merged = base.copy()
+    for key, value in override.items():
+        if isinstance(value, dict) and key in merged and isinstance(merged[key], dict):
+            merged[key] = merge_configs(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
 
-    __slots__ = ("_cache_size", "_transform_func")
+def format_data(items: List[Union[str, int]], delimiter: str = ", ") -> str:
+    """Converts a list of data to a joined string.
 
-    def __init__(self, transform_func: Callable[[Any], Any], cache_size: int = 1024):
-        self._cache_size = cache_size
-        # Memoize transformation function to speed up lookups on duplicate inputs
-        self._transform_func = functools.lru_cache(maxsize=cache_size)(transform_func)
+    Args:
+        items: A list of string or integer values.
+        delimiter: Separator used for joining elements.
 
-    def process_item(self, item: Any) -> Any:
-        """Process a single item using the cached transformation logic."""
-        return self._transform_func(item)
+    Returns:
+        A string representation of the list contents.
+    """
+    return delimiter.join(str(i) for i in items)
 
-    def process_batch(self, items: Iterable[Any], chunk_size: int = 256) -> List[Any]:
-        """Process items in memory-efficient chunks to minimize allocation overhead."""
-        iterator = iter(items)
-        results = []
+def get_nested(data: Dict[str, Any], path: List[str], default: Any = None) -> Any:
+    """Retrieves a value from a nested dictionary structure.
 
-        while True:
-            chunk = list(itertools.islice(iterator, chunk_size))
-            if not chunk:
-                break
-            results.extend(map(self._transform_func, chunk))
+    Args:
+        data: The dictionary to traverse.
+        path: A list of keys representing the path.
+        default: Value to return if path is missing.
 
-        return results
-
-    def clear_cache(self) -> None:
-        """Reset internal memoization cache statistics."""
-        self._transform_func.cache_clear()
-
-    def cache_info(self) -> functools._CacheInfo:
-        """Return cache performance metrics for monitoring."""
-        return self._transform_func.cache_info()
+    Returns:
+        The value found at the path or the default.
+    """
+    current = data
+    for key in path:
+        if not isinstance(current, dict) or key not in current:
+            return default
+        current = current[key]
+    return current
