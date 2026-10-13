@@ -1,38 +1,33 @@
+import time
 import functools
-from typing import Any, Callable, Iterable, List, TypeVar
+import random
+from typing import Callable, Any
 
-T = TypeVar("T")
-R = TypeVar("R")
+def with_retry(max_attempts: int = 3, delay: float = 1.0, backoff: float = 2.0):
+    """Decorator for retrying network operations with exponential backoff."""
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            current_delay = delay
+            last_exception = None
+            
+            for attempt in range(max_attempts):
+                try:
+                    return func(*args, **kwargs)
+                except (ConnectionError, TimeoutError) as e:
+                    last_exception = e
+                    if attempt < max_attempts - 1:
+                        time.sleep(current_delay)
+                        current_delay *= backoff
+            
+            raise last_exception
+        return wrapper
+    return decorator
 
-
-class BatchProcessor:
-    """Efficient batch processing pipeline with optimized chunking and memoization."""
-
-    def __init__(self, batch_size: int = 1000) -> None:
-        if batch_size <= 0:
-            raise ValueError("batch_size must be a positive integer")
-        self.batch_size = batch_size
-
-    def chunk_stream(self, items: Iterable[T]) -> Iterable[List[T]]:
-        """Yield successive chunks from an iterable to reduce memory overhead."""
-        chunk: List[T] = []
-        for item in items:
-            chunk.append(item)
-            if len(chunk) >= self.batch_size:
-                yield chunk
-                chunk = []
-        if chunk:
-            yield chunk
-
-    def process_batch(self, items: Iterable[T], transform: Callable[[T], R]) -> List[R]:
-        """Process items in batch streams applying transform efficiently."""
-        results: List[R] = []
-        for chunk in self.chunk_stream(items):
-            results.extend(map(transform, chunk))
-        return results
-
-
-@functools.lru_cache(maxsize=1024)
-def cached_transform(value: str) -> str:
-    """Cached string transformation for repeated lookups."""
-    return value.strip().lower()
+@with_retry(max_attempts=3, delay=2.0)
+def fetch_remote_data(url: str):
+    """Simulates a network request that may fail."""
+    # Example implementation context
+    if random.random() < 0.7:
+        raise ConnectionError("Failed to reach server")
+    return {"status": "success", "data": "sample"}
