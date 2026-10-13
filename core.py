@@ -1,49 +1,37 @@
-from typing import Any, Dict, List, Optional, Union
+import functools
+import time
+from typing import Callable, Any, Dict
 
-def merge_configs(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
-    """Recursively merges two configuration dictionaries.
+# Cache for performance optimization of expensive operations
+_memoization_cache: Dict[tuple, Any] = {}
 
-    Args:
-        base: The primary configuration dictionary.
-        override: The dictionary containing updates.
+def memoize(func: Callable) -> Callable:
+    """Decorator to cache function results based on arguments."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs) -> Any:
+        key = (func.__name__, args, frozenset(kwargs.items()))
+        if key not in _memoization_cache:
+            _memoization_cache[key] = func(*args, **kwargs)
+        return _memoization_cache[key]
+    return wrapper
 
-    Returns:
-        A new dictionary with merged values.
-    """
-    merged = base.copy()
-    for key, value in override.items():
-        if isinstance(value, dict) and key in merged and isinstance(merged[key], dict):
-            merged[key] = merge_configs(merged[key], value)
-        else:
-            merged[key] = value
-    return merged
+@memoize
+def compute_heavy_data(n: int) -> int:
+    """Simulates a resource-intensive computation task."""
+    time.sleep(0.5)
+    return sum(range(n))
 
-def format_data(items: List[Union[str, int]], delimiter: str = ", ") -> str:
-    """Converts a list of data to a joined string.
+class DataProcessor:
+    """Handles high-throughput data processing operations."""
+    def __init__(self, buffer_size: int = 1024):
+        self.buffer_size = buffer_size
+        self._cache = {}
 
-    Args:
-        items: A list of string or integer values.
-        delimiter: Separator used for joining elements.
-
-    Returns:
-        A string representation of the list contents.
-    """
-    return delimiter.join(str(i) for i in items)
-
-def get_nested(data: Dict[str, Any], path: List[str], default: Any = None) -> Any:
-    """Retrieves a value from a nested dictionary structure.
-
-    Args:
-        data: The dictionary to traverse.
-        path: A list of keys representing the path.
-        default: Value to return if path is missing.
-
-    Returns:
-        The value found at the path or the default.
-    """
-    current = data
-    for key in path:
-        if not isinstance(current, dict) or key not in current:
-            return default
-        current = current[key]
-    return current
+    def process_stream(self, data: list) -> list:
+        """Efficient batch processing using local cache."""
+        results = []
+        for item in data:
+            if item not in self._cache:
+                self._cache[item] = item * 2
+            results.append(self._cache[item])
+        return results
