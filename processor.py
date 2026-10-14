@@ -1,33 +1,30 @@
-import time
-import functools
-import random
-from typing import Callable, Any
+import json
+from typing import Any, Dict, List, Optional
+from pathlib import Path
 
-def with_retry(max_attempts: int = 3, delay: float = 1.0, backoff: float = 2.0):
-    """Decorator for retrying network operations with exponential backoff."""
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            current_delay = delay
-            last_exception = None
-            
-            for attempt in range(max_attempts):
-                try:
-                    return func(*args, **kwargs)
-                except (ConnectionError, TimeoutError) as e:
-                    last_exception = e
-                    if attempt < max_attempts - 1:
-                        time.sleep(current_delay)
-                        current_delay *= backoff
-            
-            raise last_exception
-        return wrapper
-    return decorator
+def load_json(file_path: str) -> Dict[str, Any]:
+    """Load and parse a JSON file safely."""
+    path = Path(file_path)
+    if not path.exists():
+        return {}
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
-@with_retry(max_attempts=3, delay=2.0)
-def fetch_remote_data(url: str):
-    """Simulates a network request that may fail."""
-    # Example implementation context
-    if random.random() < 0.7:
-        raise ConnectionError("Failed to reach server")
-    return {"status": "success", "data": "sample"}
+def chunk_list(data: List[Any], size: int) -> List[List[Any]]:
+    """Split a list into smaller chunks of specified size."""
+    if size <= 0:
+        raise ValueError("Chunk size must be greater than zero.")
+    return [data[i:i + size] for i in range(0, len(data), size)]
+
+def slugify(text: str) -> str:
+    """Convert string to a URL-friendly slug."""
+    return "-".join(text.lower().split()).replace(" ", "-")
+
+def get_nested(data: Dict, keys: List[str], default: Any = None) -> Any:
+    """Retrieve nested dictionary values using a key list."""
+    for key in keys:
+        if isinstance(data, dict):
+            data = data.get(key, default)
+        else:
+            return default
+    return data
