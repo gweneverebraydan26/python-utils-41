@@ -1,37 +1,32 @@
-import functools
-import logging
-from typing import Any, Callable
+import json
+import os
+from typing import Any, Dict
 
-# global registry for cached configuration values
-_CONFIG_CACHE = {}
+class ConfigLoader:
+    """Handles configuration loading from JSON files with defaults."""
 
-class ConfigManager:
-    """Thread-safe configuration accessor with memoization."""
+    def __init__(self, default_config: Dict[str, Any]):
+        self._defaults = default_config
 
-    def __init__(self) -> None:
-        self._settings = {}
+    def load(self, file_path: str) -> Dict[str, Any]:
+        """Loads config from file, merging with defaults."""
+        config = self._defaults.copy()
+        
+        if not os.path.exists(file_path):
+            return config
 
-    @functools.lru_cache(maxsize=128)
-    def get_setting(self, key: str, default: Any = None) -> Any:
-        """retrieve setting value with lru_cache performance boost."""
-        return self._settings.get(key, default)
+        try:
+            with open(file_path, 'r') as f:
+                file_data = json.load(f)
+                config.update(file_data)
+        except (json.JSONDecodeError, IOError):
+            pass
+            
+        return config
 
-    def update_setting(self, key: str, value: Any) -> None:
-        """update setting and clear specific cache entries."""
-        self._settings[key] = value
-        self.get_setting.cache_clear()
-
-    def bulk_load(self, data: dict) -> None:
-        """bulk update for dictionary configurations."""
-        self._settings.update(data)
-        self.get_setting.cache_clear()
-
-def memoized_config(func: Callable) -> Callable:
-    """decorator for expensive configuration lookup methods."""
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        key = (func.__name__, str(args), str(kwargs))
-        if key not in _CONFIG_CACHE:
-            _CONFIG_CACHE[key] = func(*args, **kwargs)
-        return _CONFIG_CACHE[key]
-    return wrapper
+# Usage example
+if __name__ == '__main__':
+    defaults = {"host": "localhost", "port": 8080, "debug": False}
+    loader = ConfigLoader(defaults)
+    current_config = loader.load("config.json")
+    print(f"Active config: {current_config}")
