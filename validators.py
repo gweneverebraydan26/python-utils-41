@@ -1,39 +1,48 @@
-from typing import Any, Optional, Dict
+"""Data validation utilities for batch processing loops."""
 
-def validate_schema(data: Any, schema: Dict[str, type]) -> bool:
-    """
-    Validates that a dictionary matches the provided type schema.
-    Returns True if valid, False otherwise.
-    """
-    if not isinstance(data, dict):
-        return False
+from typing import Any, Dict, List, Tuple
 
-    for key, expected_type in schema.items():
-        if key not in data:
-            return False
-        if not isinstance(data[key], expected_type):
-            return False
-            
-    return True
 
-def sanitize_input(value: Any) -> str:
-    """
-    Converts any input into a stripped, safe string.
-    """
-    if value is None:
-        return ""
-    return str(value).strip()
+class ValidationError(Exception):
+    """Raised when input data fails validation criteria."""
+    pass
 
-def get_nested(data: Dict, path: str, default: Any = None) -> Any:
-    """
-    Retrieves nested dictionary values using dot notation.
-    Example: get_nested(data, 'user.profile.id')
-    """
-    keys = path.split('.')
-    current = data
-    try:
-        for key in keys:
-            current = current[key]
-        return current
-    except (KeyError, TypeError, AttributeError):
-        return default
+
+def validate_item(item: Dict[str, Any]) -> Tuple[bool, str]:
+    """Validate a single payload item before processing."""
+    if not isinstance(item, dict):
+        return False, "Input item must be a dictionary"
+
+    if "id" not in item or not str(item["id"]).strip():
+        return False, "Missing or empty 'id' field"
+
+    if "name" not in item or not isinstance(item["name"], str):
+        return False, "Missing or non-string 'name' field"
+
+    if "value" in item and not isinstance(item["value"], (int, float)):
+        return False, "Field 'value' must be numeric"
+
+    return True, "OK"
+
+
+def process_input_batch(items: List[Dict[str, Any]]) -> Dict[str, List[Any]]:
+    """Process a list of raw inputs, validating each item in the main loop."""
+    processed = []
+    errors = []
+
+    for idx, raw_item in enumerate(items):
+        is_valid, message = validate_item(raw_item)
+        if not is_valid:
+            errors.append({"index": idx, "item": raw_item, "error": message})
+            continue
+
+        # Standardize verified payload
+        clean_item = {
+            "id": str(raw_item["id"]).strip(),
+            "name": raw_item["name"].strip(),
+            "value": float(raw_item.get("value", 0.0)),
+            "status": "validated",
+        }
+        processed.append(clean_item)
+
+    return {"processed": processed, "errors": errors}
