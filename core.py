@@ -1,64 +1,35 @@
-import random
+import functools
 import time
-from functools import wraps
-from typing import Callable, Any, Tuple, Type
+from typing import Callable, Any, Dict
 
+# Cache for expensive function calls to improve performance
+_MEMOIZATION_CACHE: Dict[tuple, Any] = {}
 
-def retry_network_op(
-    max_retries: int = 3,
-    backoff_factor: float = 1.0,
-    exceptions: Tuple[Type[BaseException], ...] = (ConnectionError, TimeoutError, OSError),
-    jitter: bool = True,
-) -> Callable:
-    """Decorator that retries a network operation with exponential backoff.
+def memoize(func: Callable) -> Callable:
+    """Decorator to cache results of deterministic functions."""
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        key = (func.__name__, args, frozenset(kwargs.items()))
+        if key not in _MEMOIZATION_CACHE:
+            _MEMOIZATION_CACHE[key] = func(*args, **kwargs)
+        return _MEMOIZATION_CACHE[key]
+    return wrapper
 
-    Args:
-        max_retries: Maximum number of retry attempts allowed.
-        backoff_factor: Multiplier for exponential delay calculation.
-        exceptions: Tuple of exception types to catch and trigger retries.
-        jitter: Adds random noise to delay calculation to avoid thundering herd.
-    """
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            attempts = 0
-            while True:
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as exc:
-                    attempts += 1
-                    if attempts > max_retries:
-                        raise exc
+def batch_process(data: list, chunk_size: int = 100) -> list:
+    """Generator for processing data in chunks to optimize memory."""
+    for i in range(0, len(data), chunk_size):
+        yield data[i:i + chunk_size]
 
-                    # Calculate exponential backoff delay
-                    delay = backoff_factor * (2 ** (attempts - 1))
-                    if jitter:
-                        delay += random.uniform(0, 0.5 * delay)
+class PerformanceTracker:
+    """Context manager for tracking code block execution duration."""
+    def __init__(self, name: str):
+        self.name = name
+        self.start = 0.0
 
-                    time.sleep(delay)
-        return wrapper
-    return decorator
+    def __enter__(self):
+        self.start = time.perf_counter()
+        return self
 
-
-class NetworkRetrier:
-    """Context manager or runner for executing network calls with retry policies."""
-
-    def __init__(
-        self, 
-        max_retries: int = 3, 
-        delay: float = 1.0, 
-        exceptions: Tuple[Type[BaseException], ...] = (ConnectionError, TimeoutError)
-    ):
-        self.max_retries = max_retries
-        self.delay = delay
-        self.exceptions = exceptions
-
-    def execute(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
-        """Executes a target function applying the configured retry limits."""
-        for attempt in range(1, self.max_retries + 2):
-            try:
-                return func(*args, **kwargs)
-            except self.exceptions as exc:
-                if attempt > self.max_retries:
-                    raise exc
-                time.sleep(self.delay * (2 ** (attempt - 1)))
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        duration = time.perf_counter() - self.start
+        print(f"[PERF] {self.name} took {duration:.4f} seconds")
