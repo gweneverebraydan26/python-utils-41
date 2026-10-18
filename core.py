@@ -1,33 +1,64 @@
+import random
 import time
-import functools
-import logging
-from typing import Callable, Any
+from functools import wraps
+from typing import Callable, Any, Tuple, Type
 
-logger = logging.getLogger(__name__)
 
-def retry(max_attempts: int = 3, delay: float = 1.0, exceptions: tuple = (Exception,)): 
-    """Decorator for retrying network operations with backoff."""
+def retry_network_op(
+    max_retries: int = 3,
+    backoff_factor: float = 1.0,
+    exceptions: Tuple[Type[BaseException], ...] = (ConnectionError, TimeoutError, OSError),
+    jitter: bool = True,
+) -> Callable:
+    """Decorator that retries a network operation with exponential backoff.
+
+    Args:
+        max_retries: Maximum number of retry attempts allowed.
+        backoff_factor: Multiplier for exponential delay calculation.
+        exceptions: Tuple of exception types to catch and trigger retries.
+        jitter: Adds random noise to delay calculation to avoid thundering herd.
+    """
     def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             attempts = 0
-            while attempts < max_attempts:
+            while True:
                 try:
                     return func(*args, **kwargs)
-                except exceptions as e:
+                except exceptions as exc:
                     attempts += 1
-                    if attempts >= max_attempts:
-                        logger.error(f"Failed after {max_attempts} attempts: {e}")
-                        raise
-                    time.sleep(delay * attempts)
+                    if attempts > max_retries:
+                        raise exc
+
+                    # Calculate exponential backoff delay
+                    delay = backoff_factor * (2 ** (attempts - 1))
+                    if jitter:
+                        delay += random.uniform(0, 0.5 * delay)
+
+                    time.sleep(delay)
         return wrapper
     return decorator
 
-@retry(max_attempts=3, delay=2.0)
-def fetch_url(url: str) -> str:
-    """Example network operation function."""
-    # Simulates potential transient network failure
-    import random
-    if random.random() < 0.5:
-        raise ConnectionError("Transient network error occurred")
-    return f"Content from {url}"
+
+class NetworkRetrier:
+    """Context manager or runner for executing network calls with retry policies."""
+
+    def __init__(
+        self, 
+        max_retries: int = 3, 
+        delay: float = 1.0, 
+        exceptions: Tuple[Type[BaseException], ...] = (ConnectionError, TimeoutError)
+    ):
+        self.max_retries = max_retries
+        self.delay = delay
+        self.exceptions = exceptions
+
+    def execute(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+        """Executes a target function applying the configured retry limits."""
+        for attempt in range(1, self.max_retries + 2):
+            try:
+                return func(*args, **kwargs)
+            except self.exceptions as exc:
+                if attempt > self.max_retries:
+                    raise exc
+                time.sleep(self.delay * (2 ** (attempt - 1)))
