@@ -1,28 +1,30 @@
 import logging
-import sys
-from typing import Optional
+from logging.handlers import RotatingFileHandler
+import os
 
-def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
-    """Configures a standard logger instance for project modules."""
+def setup_logger(name: str, log_file: str = 'app.log', level: int = logging.INFO) -> logging.Logger:
+    """Configures a rotating file logger for the application."""
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
+    # Prevent duplicate handlers if logger is initialized multiple times
     if not logger.handlers:
         formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
 
-        stream_handler = logging.StreamHandler(sys.stdout)
-        stream_handler.setFormatter(formatter)
-        logger.addHandler(stream_handler)
+        # 5MB file rotation with 3 backup files
+        handler = RotatingFileHandler(
+            log_file, 
+            maxBytes=5*1024*1024, 
+            backupCount=3
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+        # Also output to console for convenience
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
     return logger
-
-def get_child_logger(parent: logging.Logger, suffix: str) -> logging.Logger:
-    """Creates a hierarchical child logger from a parent."""
-    return parent.getChild(suffix)
-
-def log_exception(logger: logging.Logger, e: Exception, context: str = "") -> None:
-    """Logs an exception with optional contextual information."""
-    msg = f"Error occurred: {context}" if context else "Error occurred"
-    logger.exception(f"{msg} - {str(e)}")
