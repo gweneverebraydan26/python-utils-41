@@ -1,29 +1,36 @@
+import json
 import logging
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-def validate_payload(data: Any) -> Optional[Dict]:
-    """Validate dictionary structure for processing loop."""
-    if not isinstance(data, dict):
-        logger.warning(f"Invalid input type: {type(data)}")
-        return None
-    
-    required_keys = {'id', 'action', 'timestamp'}
-    if not all(k in data for k in required_keys):
-        logger.warning(f"Missing required keys in payload: {data.keys()}")
+def safe_load_json(file_path: str) -> Optional[Dict[str, Any]]:
+    """Safely load and parse JSON from a file."""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logger.error(f"Failed to load JSON from {file_path}: {e}")
         return None
 
-    return data
+def chunk_list(data: list, size: int):
+    """Split a list into smaller chunks."""
+    for i in range(0, len(data), size):
+        yield data[i:i + size]
 
-def process_main_loop(items: list):
-    """Main loop with validation logic."""
-    for item in items:
-        validated = validate_payload(item)
-        if validated is None:
-            continue
-        
-        try:
-            print(f"Processing ID: {validated['id']}")
-        except Exception as e:
-            logger.error(f"Execution error on item {item.get('id')}: {e}")
+def dict_get_nested(data: Dict, keys: str, default: Any = None) -> Any:
+    """Access nested dictionary values using dot notation."""
+    parts = keys.split('.')
+    current = data
+    try:
+        for part in parts:
+            current = current[part]
+        return current
+    except (KeyError, TypeError):
+        return default
+
+def normalize_string(value: str) -> str:
+    """Strip whitespace and lowercase a string."""
+    if not isinstance(value, str):
+        return ""
+    return value.strip().lower()
