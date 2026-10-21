@@ -1,35 +1,35 @@
-import functools
-import time
-from typing import Callable, Any, Dict
+import logging
+from typing import Any, Optional, Callable
 
-# Cache for expensive function calls to improve performance
-_MEMOIZATION_CACHE: Dict[tuple, Any] = {}
+logger = logging.getLogger(__name__)
 
-def memoize(func: Callable) -> Callable:
-    """Decorator to cache results of deterministic functions."""
-    @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        key = (func.__name__, args, frozenset(kwargs.items()))
-        if key not in _MEMOIZATION_CACHE:
-            _MEMOIZATION_CACHE[key] = func(*args, **kwargs)
-        return _MEMOIZATION_CACHE[key]
-    return wrapper
+def safe_execute(func: Callable, *args: Any, default: Any = None, **kwargs: Any) -> Any:
+    """Executes a function with error catching for edge cases."""
+    try:
+        if not callable(func):
+            raise ValueError(f"Provided object {func} is not callable")
+        return func(*args, **kwargs)
+    except (TypeError, ValueError, AttributeError) as e:
+        logger.error(f"Logical execution error in {func.__name__}: {e}")
+    except Exception as e:
+        logger.critical(f"Unexpected system failure: {e}")
+    return default
 
-def batch_process(data: list, chunk_size: int = 100) -> list:
-    """Generator for processing data in chunks to optimize memory."""
-    for i in range(0, len(data), chunk_size):
-        yield data[i:i + chunk_size]
+def validate_input(data: Any, expected_type: type) -> Optional[Any]:
+    """Sanitizes and validates input data types."""
+    if data is None:
+        return None
+    
+    try:
+        if isinstance(data, expected_type):
+            return data
+        return expected_type(data)
+    except (ValueError, TypeError):
+        logger.warning(f"Failed to cast {data} to {expected_type.__name__}")
+        return None
 
-class PerformanceTracker:
-    """Context manager for tracking code block execution duration."""
-    def __init__(self, name: str):
-        self.name = name
-        self.start = 0.0
-
-    def __enter__(self):
-        self.start = time.perf_counter()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        duration = time.perf_counter() - self.start
-        print(f"[PERF] {self.name} took {duration:.4f} seconds")
+# Main entry point for utility execution
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    result = safe_execute(int, "invalid", default=0)
+    print(f"Safe execution result: {result}")
