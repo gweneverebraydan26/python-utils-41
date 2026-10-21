@@ -1,36 +1,38 @@
 import logging
-from logging.handlers import RotatingFileHandler
-import os
+import sys
+from typing import Optional
 
-def setup_logger(name: str, log_file: str, level=logging.INFO):
-    """Configures a rotating file logger for general tasks."""
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
+class DataLogger:
+    """Utility class for standardized application logging."""
 
-    # Prevent duplicate handlers if logger is re-initialized
-    if not logger.handlers:
+    def __init__(self, name: str = "python-utils-41", level: int = logging.INFO):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(level)
+        
+        # Standard formatting for consistent log output
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
         )
 
-        # Rotate logs at 5MB, keeping 3 backups
-        handler = RotatingFileHandler(
-            log_file, 
-            maxBytes=5 * 1024 * 1024, 
-            backupCount=3
-        )
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+        # Ensure stream handler is present
+        if not self.logger.handlers:
+            handler = logging.StreamHandler(sys.stdout)
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
 
-        # Optional: Add stream handler for console output
-        console = logging.StreamHandler()
-        console.setFormatter(formatter)
-        logger.addHandler(console)
+    def info(self, message: str) -> None:
+        """Logs informational messages to stdout."""
+        self.logger.info(message)
 
-    return logger
+    def error(self, message: str, exc_info: bool = True) -> None:
+        """Logs error messages including stack trace."""
+        self.logger.error(message, exc_info=exc_info)
 
-# Example usage:
-if __name__ == "__main__":
-    os.makedirs('logs', exist_ok=True)
-    app_logger = setup_logger('app_utils', 'logs/app.log')
-    app_logger.info('Logger initialized successfully')
+    def warning(self, message: str) -> None:
+        """Logs warning level diagnostics."""
+        self.logger.warning(message)
+
+def get_default_logger() -> DataLogger:
+    """Factory method for global logger instance."""
+    return DataLogger()
