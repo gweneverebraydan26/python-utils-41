@@ -1,24 +1,37 @@
-class UtilityError(Exception):
-    """Base exception for python-utils-41"""
-    pass
+class UtilsError(Exception):
+    """Base exception for python-utils-41."""
 
-class DataProcessingError(UtilityError):
-    """Raised when data transformation fails"""
-    pass
+class ValidationError(UtilsError):
+    """Raised when data fails schema validation."""
 
-class ValidationError(UtilityError):
-    """Raised when data validation fails"""
-    pass
+class ConfigurationError(UtilsError):
+    """Raised for invalid application settings."""
 
-def raise_if_invalid(data: dict, schema: list) -> None:
-    """Validates dictionary keys against schema list"""
-    missing = [key for key in schema if key not in data]
-    if missing:
-        raise ValidationError(f"Missing required keys: {', '.join(missing)}")
+class ResourceNotFoundError(UtilsError):
+    """Raised when a requested resource is missing."""
 
-def safe_extract(data: dict, key: str, default=None):
-    """Safe key retrieval from nested dictionaries"""
+def handle_exception(e: Exception) -> None:
+    """Centralized error logging for library operations."""
+    if isinstance(e, UtilsError):
+        print(f"[Library Error] {e.__class__.__name__}: {str(e)}")
+    else:
+        print(f"[Unexpected Error] {type(e).__name__}: {str(e)}")
+
+def validate_input(data: any) -> bool:
+    """Ensure data is not None or empty."""
+    if data is None:
+        raise ValidationError("Input data cannot be None")
+    if hasattr(data, '__len__') and len(data) == 0:
+        raise ValidationError("Input data cannot be empty")
+    return True
+
+def safe_execute(func, *args, **kwargs):
+    """Wrapper to catch and format library exceptions."""
     try:
-        return data.get(key, default)
-    except AttributeError:
-        raise DataProcessingError(f"Invalid data format: expected dict, got {type(data).__name__}")
+        return func(*args, **kwargs)
+    except UtilsError as e:
+        handle_exception(e)
+        return None
+    except Exception as e:
+        handle_exception(e)
+        raise
