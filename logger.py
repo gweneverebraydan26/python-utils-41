@@ -1,38 +1,33 @@
 import logging
-import sys
-from typing import Optional
+from logging.handlers import RotatingFileHandler
+import os
 
-class DataLogger:
-    """Utility class for standardized application logging."""
+def setup_logger(name: str, log_file: str, level: int = logging.INFO) -> logging.Logger:
+    """Configures a rotating file logger."""
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
 
-    def __init__(self, name: str = "python-utils-41", level: int = logging.INFO):
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(level)
-        
-        # Standard formatting for consistent log output
-        formatter = logging.Formatter(
-            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S"
+    # Prevent duplicate handlers if logger is re-initialized
+    if not logger.handlers:
+        # 5MB per file, keep 3 backup files
+        handler = RotatingFileHandler(
+            log_file, 
+            maxBytes=5 * 1024 * 1024, 
+            backupCount=3
         )
+        
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        
+        # Optional console output
+        console = logging.StreamHandler()
+        console.setFormatter(formatter)
+        logger.addHandler(console)
 
-        # Ensure stream handler is present
-        if not self.logger.handlers:
-            handler = logging.StreamHandler(sys.stdout)
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
+    return logger
 
-    def info(self, message: str) -> None:
-        """Logs informational messages to stdout."""
-        self.logger.info(message)
-
-    def error(self, message: str, exc_info: bool = True) -> None:
-        """Logs error messages including stack trace."""
-        self.logger.error(message, exc_info=exc_info)
-
-    def warning(self, message: str) -> None:
-        """Logs warning level diagnostics."""
-        self.logger.warning(message)
-
-def get_default_logger() -> DataLogger:
-    """Factory method for global logger instance."""
-    return DataLogger()
+# Example usage for project-wide logging
+app_logger = setup_logger('python-utils-41', 'app.log')
