@@ -1,32 +1,32 @@
 import os
-import logging
+import re
 from typing import Final
 
-# Application configuration defaults
-DEFAULT_ENCODING: Final[str] = 'utf-8'
-CHUNK_SIZE: Final[int] = 8192
-MAX_RETRIES: Final[int] = 3
+# general application constants and regex patterns
 
-# Environment-based paths with fallback
+APP_NAME: Final[str] = "python-utils-41"
+VERSION: Final[str] = "1.0.0"
+
+# pattern for standard email validation
+EMAIL_REGEX: Final[re.Pattern] = re.compile(
+    r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+)
+
+# default timeout configuration for network operations
+DEFAULT_TIMEOUT: Final[int] = 30
+
+# directory configuration
 BASE_DIR: Final[str] = os.path.dirname(os.path.abspath(__file__))
-LOG_DIR: Final[str] = os.getenv('LOG_DIR', os.path.join(BASE_DIR, 'logs'))
+LOG_DIR: Final[str] = os.path.join(BASE_DIR, "logs")
 
-# Standardized date/time formats
-ISO_DATETIME_FORMAT: Final[str] = '%Y-%m-%dT%H:%M:%S%z'
-FILE_DATE_FORMAT: Final[str] = '%Y%m%d_%H%M%S'
+# common status codes used across utility modules
+STATUS_SUCCESS: Final[int] = 200
+STATUS_ERROR: Final[int] = 500
+STATUS_UNAUTHORIZED: Final[int] = 401
 
-# Logging configuration defaults
-LOG_LEVEL: Final[int] = logging.INFO
-LOG_FORMAT: Final[str] = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# environment variable keys
+ENV_VAR_DEBUG: Final[str] = "DEBUG_MODE"
+ENV_VAR_API_KEY: Final[str] = "APP_API_KEY"
 
-# Timeout settings in seconds
-DEFAULT_TIMEOUT: Final[float] = 30.0
-HTTP_READ_TIMEOUT: Final[float] = 10.0
-
-# Supported file extensions for processing
-SUPPORTED_EXTENSIONS: Final[tuple[str, ...]] = ('.json', '.yaml', '.txt', '.csv')
-
-# Environment identifiers
-ENV_PRODUCTION: Final[str] = 'production'
-ENV_DEVELOPMENT: Final[str] = 'development'
-ENV_TESTING: Final[str] = 'testing'
+# list of supported file extensions for processors
+SUPPORTED_EXTENSIONS: Final[tuple] = (".json", ".yaml", ".yml", ".csv")
