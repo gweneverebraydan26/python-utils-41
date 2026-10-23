@@ -1,39 +1,34 @@
-import json
+from typing import Any, Dict, Optional, Callable
 import logging
-from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-def safe_json_load(data: str, default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Parses JSON string or returns a default dict."""
-    try:
-        return json.loads(data)
-    except (json.JSONDecodeError, TypeError) as e:
-        logger.error(f"failed to parse json: {e}")
-        return default or {}
+class DataHandler:
+    """Handles transformation and routing of processed data."""
 
-def chunk_list(data: list, size: int):
-    """Yield successive chunks from a list."""
-    for i in range(0, len(data), size):
-        yield data[i:i + size]
+    def __init__(self, prefix: str = "proc_") -> None:
+        self.prefix: str = prefix
+        self.registry: Dict[str, Callable] = {}
 
-def dict_get_nested(data: Dict, path: str, delimiter: str = '.') -> Any:
-    """Retrieve value from nested dictionary using path string."""
-    keys = path.split(delimiter)
-    value = data
-    try:
-        for key in keys:
-            value = value[key]
-        return value
-    except (KeyError, TypeError):
-        return None
+    def register_task(self, name: str, func: Callable[[Any], Any]) -> None:
+        """Registers a processing function with a unique identifier."""
+        self.registry[f"{self.prefix}{name}"] = func
 
-def slugify_string(text: str) -> str:
-    """Convert string to simple lowercase slug."""
-    return "-".join(text.lower().split()).replace("_", "-")
+    def execute(self, name: str, data: Any) -> Optional[Any]:
+        """Executes a registered task if it exists."""
+        task_key = f"{self.prefix}{name}"
+        func = self.registry.get(task_key)
+        
+        if not func:
+            logger.error(f"Task {task_key} not found in registry")
+            return None
+            
+        try:
+            return func(data)
+        except Exception as e:
+            logger.exception(f"Error executing task {task_key}: {e}")
+            return None
 
-def ensure_list(value: Any) -> list:
-    """Force input into a list format."""
-    if value is None:
-        return []
-    return value if isinstance(value, list) else [value]
+    def list_tasks(self) -> list[str]:
+        """Returns a list of all currently registered task names."""
+        return list(self.registry.keys())
