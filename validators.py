@@ -1,48 +1,30 @@
-"""Data validation utilities for batch processing loops."""
+import re
+from typing import Any, Optional
 
-from typing import Any, Dict, List, Tuple
+EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
 
+def is_valid_email(email: Any) -> bool:
+    """Validate string format for email addresses."""
+    if not isinstance(email, str):
+        return False
+    return bool(EMAIL_REGEX.match(email))
 
-class ValidationError(Exception):
-    """Raised when input data fails validation criteria."""
-    pass
+def is_non_empty_string(value: Any) -> bool:
+    """Check if value is a string and contains non-whitespace."""
+    return isinstance(value, str) and bool(value.strip())
 
+def ensure_list(value: Any) -> list:
+    """Convert single items to lists, leave lists unchanged."""
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return list(value)
+    return [value]
 
-def validate_item(item: Dict[str, Any]) -> Tuple[bool, str]:
-    """Validate a single payload item before processing."""
-    if not isinstance(item, dict):
-        return False, "Input item must be a dictionary"
+def validate_range(value: int, min_val: int, max_val: int) -> bool:
+    """Check if integer falls within inclusive boundaries."""
+    return isinstance(value, int) and min_val <= value <= max_val
 
-    if "id" not in item or not str(item["id"]).strip():
-        return False, "Missing or empty 'id' field"
-
-    if "name" not in item or not isinstance(item["name"], str):
-        return False, "Missing or non-string 'name' field"
-
-    if "value" in item and not isinstance(item["value"], (int, float)):
-        return False, "Field 'value' must be numeric"
-
-    return True, "OK"
-
-
-def process_input_batch(items: List[Dict[str, Any]]) -> Dict[str, List[Any]]:
-    """Process a list of raw inputs, validating each item in the main loop."""
-    processed = []
-    errors = []
-
-    for idx, raw_item in enumerate(items):
-        is_valid, message = validate_item(raw_item)
-        if not is_valid:
-            errors.append({"index": idx, "item": raw_item, "error": message})
-            continue
-
-        # Standardize verified payload
-        clean_item = {
-            "id": str(raw_item["id"]).strip(),
-            "name": raw_item["name"].strip(),
-            "value": float(raw_item.get("value", 0.0)),
-            "status": "validated",
-        }
-        processed.append(clean_item)
-
-    return {"processed": processed, "errors": errors}
+def safe_get(data: dict, key: str, default: Any = None) -> Any:
+    """Retrieve value from dict with fallback."""
+    return data.get(key, default) if isinstance(data, dict) else default
