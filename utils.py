@@ -1,30 +1,33 @@
-import time
-import functools
 import logging
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-def retry(exceptions, tries=3, delay=1, backoff=2):
-    """
-    Decorator for retrying network operations with exponential backoff.
-    
-    :param exceptions: Tuple of exception classes to catch.
-    :param tries: Maximum number of attempts.
-    :param delay: Initial delay between retries in seconds.
-    :param backoff: Multiplier for delay after each retry.
-    """
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            mtries, mdelay = tries, delay
-            while mtries > 1:
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    logger.warning(f"{func.__name__} failed: {e}, retrying in {mdelay}s...")
-                    time.sleep(mdelay)
-                    mtries -= 1
-                    mdelay *= backoff
-            return func(*args, **kwargs)
-        return wrapper
-    return decorator
+def safe_execute(func: callable, *args: Any, **kwargs: Any) -> Optional[Any]:
+    """Executes a function safely with error handling for edge cases."""
+    try:
+        return func(*args, **kwargs)
+    except (ValueError, TypeError) as e:
+        logger.error(f"Invalid input provided: {e}")
+        return None
+    except ZeroDivisionError:
+        logger.error("Arithmetic error: division by zero")
+        return None
+    except Exception as e:
+        logger.critical(f"Unexpected system failure: {e}")
+        raise
+
+def parse_int_safe(value: Any, default: int = 0) -> int:
+    """Converts input to integer with fallback for invalid types."""
+    try:
+        return int(value)
+    except (ValueError, TypeError, OverflowError):
+        return default
+
+def validate_connection_string(conn_str: Optional[str]) -> bool:
+    """Validates string input for null or empty edge cases."""
+    if conn_str is None:
+        return False
+    if not isinstance(conn_str, str):
+        return False
+    return len(conn_str.strip()) > 0
