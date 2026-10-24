@@ -1,30 +1,29 @@
 import re
 from typing import Any, Optional
 
-EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
-
-def is_valid_email(email: Any) -> bool:
-    """Validate string format for email addresses."""
-    if not isinstance(email, str):
-        return False
-    return bool(EMAIL_REGEX.match(email))
+def is_email(email: str) -> bool:
+    """Validate standard email address format."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
 
 def is_non_empty_string(value: Any) -> bool:
-    """Check if value is a string and contains non-whitespace."""
+    """Check if input is a string and not empty after whitespace trim."""
     return isinstance(value, str) and bool(value.strip())
 
-def ensure_list(value: Any) -> list:
-    """Convert single items to lists, leave lists unchanged."""
-    if value is None:
-        return []
-    if isinstance(value, (list, tuple, set)):
-        return list(value)
-    return [value]
+def is_valid_int(value: Any, min_val: Optional[int] = None, max_val: Optional[int] = None) -> bool:
+    """Check if value is integer and within optional bounds."""
+    if not isinstance(value, int) or isinstance(value, bool):
+        return False
+    if min_val is not None and value < min_val:
+        return False
+    if max_val is not None and value > max_val:
+        return False
+    return True
 
-def validate_range(value: int, min_val: int, max_val: int) -> bool:
-    """Check if integer falls within inclusive boundaries."""
-    return isinstance(value, int) and min_val <= value <= max_val
+def validate_schema(data: dict, required_keys: list[str]) -> bool:
+    """Check if all required keys are present in dict."""
+    return all(key in data for key in required_keys)
 
-def safe_get(data: dict, key: str, default: Any = None) -> Any:
-    """Retrieve value from dict with fallback."""
-    return data.get(key, default) if isinstance(data, dict) else default
+def sanitize_input(value: str) -> str:
+    """Remove dangerous characters from strings."""
+    return re.sub(r'[^a-zA-Z0-9\s]', '', value)
