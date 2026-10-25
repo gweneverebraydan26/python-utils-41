@@ -1,34 +1,39 @@
-from typing import Any, Dict, Optional, Callable
+import time
+import functools
 import logging
 
 logger = logging.getLogger(__name__)
 
-class DataHandler:
-    """Handles transformation and routing of processed data."""
+def retry_network_op(retries=3, delay=1, backoff=2, exceptions=(Exception,)):
+    """
+    decorator for retrying network operations with exponential backoff
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            current_delay = delay
+            for attempt in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    if attempt == retries - 1:
+                        logger.error(f"failed after {retries} attempts: {e}")
+                        raise
+                    
+                    logger.warning(f"attempt {attempt + 1} failed, retrying in {current_delay}s...")
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+        return wrapper
+    return decorator
 
-    def __init__(self, prefix: str = "proc_") -> None:
-        self.prefix: str = prefix
-        self.registry: Dict[str, Callable] = {}
+@retry_network_op(retries=3, delay=2)
+def fetch_data(url):
+    # simulate network request
+    raise ConnectionError("timeout")
 
-    def register_task(self, name: str, func: Callable[[Any], Any]) -> None:
-        """Registers a processing function with a unique identifier."""
-        self.registry[f"{self.prefix}{name}"] = func
-
-    def execute(self, name: str, data: Any) -> Optional[Any]:
-        """Executes a registered task if it exists."""
-        task_key = f"{self.prefix}{name}"
-        func = self.registry.get(task_key)
-        
-        if not func:
-            logger.error(f"Task {task_key} not found in registry")
-            return None
-            
-        try:
-            return func(data)
-        except Exception as e:
-            logger.exception(f"Error executing task {task_key}: {e}")
-            return None
-
-    def list_tasks(self) -> list[str]:
-        """Returns a list of all currently registered task names."""
-        return list(self.registry.keys())
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    try:
+        fetch_data("http://example.com")
+    except Exception:
+        pass
