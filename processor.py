@@ -1,42 +1,64 @@
-"""Data processing utilities for handling nested structures and record sets."""
-
+import math
 from typing import Any, Dict, List, Optional
 
 
-def flatten_dict(
-    nested_dict: Dict[str, Any],
-    parent_key: str = "",
-    sep: str = ".",
-) -> Dict[str, Any]:
-    """Recursively flattens a nested dictionary using a character separator."""
-    items: List[tuple] = []
-    for key, value in nested_dict.items():
-        new_key = f"{parent_key}{sep}{key}" if parent_key else key
-        if isinstance(value, dict):
-            items.extend(flatten_dict(value, new_key, sep=sep).items())
-        elif isinstance(value, list):
-            for idx, item in enumerate(value):
-                list_key = f"{new_key}{sep}{idx}"
-                if isinstance(item, dict):
-                    items.extend(flatten_dict(item, list_key, sep=sep).items())
-                else:
-                    items.append((list_key, item))
-        else:
-            items.append((new_key, value))
-    return dict(items)
+class ProcessingError(Exception):
+    """Custom exception raised when data processing encounters critical errors."""
+    pass
 
 
-def batch_process_records(
-    records: List[Dict[str, Any]],
-    flatten: bool = True,
-    required_keys: Optional[List[str]] = None,
-) -> List[Dict[str, Any]]:
-    """Cleans, optionally flattens, and filters records based on key constraints."""
-    processed_records = []
-    for record in records:
-        current = flatten_dict(record) if flatten else record.copy()
-        # Verify all required keys exist in the record
-        if required_keys and not all(k in current for k in required_keys):
-            continue
-        processed_records.append(current)
-    return processed_records
+class DataProcessor:
+    """Utility class to process structured numerical and text data safely."""
+
+    def __init__(self, strict_mode: bool = False):
+        self.strict_mode = strict_mode
+
+    def safe_numeric_cast(self, value: Any, default: float = 0.0) -> float:
+        """Cast input value to float safely, handling NaN and Infinity edge cases."""
+        if value is None:
+            return default
+        try:
+            num = float(value)
+            if math.isnan(num) or math.isinf(num):
+                if self.strict_mode:
+                    raise ProcessingError(f"Invalid numeric state encountered: {num}")
+                return default
+            return num
+        except (ValueError, TypeError) as err:
+            if self.strict_mode:
+                raise ProcessingError(f"Failed to cast {value!r} to float: {err}") from err
+            return default
+
+    def process_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        """Process individual data records with edge case validation."""
+        if not isinstance(record, dict):
+            if self.strict_mode:
+                raise ProcessingError(f"Expected dict record, got {type(record).__name__}")
+            return {}
+
+        cleaned_data: Dict[str, Any] = {}
+        for key, val in record.items():
+            if not isinstance(key, str) or not key.strip():
+                continue  # Skip non-string or whitespace-only keys
+            
+            clean_key = key.strip().lower()
+            if isinstance(val, (int, float, str)):
+                cleaned_data[clean_key] = self.safe_numeric_cast(val)
+            elif isinstance(val, list):
+                cleaned_data[clean_key] = [self.safe_numeric_cast(item) for item in val]
+            else:
+                cleaned_data[clean_key] = None
+
+        return cleaned_data
+
+    def calculate_ratios(self, values: List[float], base: float) -> List[float]:
+        """Compute ratios relative to base, safely avoiding division by zero."""
+        safe_base = self.safe_numeric_cast(base, default=0.0)
+        if safe_base == 0.0:
+            return [0.0 for _ in values]
+
+        results = []
+        for item in values:
+            safe_val = self.safe_numeric_cast(item, default=0.0)
+            results.append(round(safe_val / safe_base, 4))
+        return results
