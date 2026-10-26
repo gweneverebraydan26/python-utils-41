@@ -3,62 +3,49 @@ import os
 from typing import Any, Dict, Optional
 
 
-class ConfigError(Exception):
-    """Base exception raised for configuration loading errors."""
-    pass
-
-
 class ConfigLoader:
-    """Loads and validates application configuration settings safely."""
+    """Manages application configuration with default fallback values."""
 
-    def __init__(self, default_config: Optional[Dict[str, Any]] = None) -> None:
-        self._config: Dict[str, Any] = default_config.copy() if default_config else {}
+    def __init__(self, defaults: Optional[Dict[str, Any]] = None):
+        self._config: Dict[str, Any] = defaults.copy() if defaults else {}
 
-    def load_from_file(self, filepath: str) -> Dict[str, Any]:
-        """Loads configuration from a JSON file with edge-case handling."""
-        if not isinstance(filepath, str) or not filepath.strip():
-            raise ConfigError("Filepath must be a non-empty string")
+    def load_from_dict(self, data: Dict[str, Any]) -> None:
+        """Update configuration settings from a dictionary."""
+        self._config.update(data)
 
+    def load_from_json(self, filepath: str) -> bool:
+        """Load configuration from a JSON file if it exists."""
         if not os.path.exists(filepath):
-            raise ConfigError(f"Configuration file not found: {filepath}")
-
-        if not os.path.isfile(filepath):
-            raise ConfigError(f"Specified path is not a file: {filepath}")
+            return False
 
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if not isinstance(data, dict):
-                    raise ConfigError("Root configuration structure must be a JSON object")
-                self._config.update(data)
-        except json.JSONDecodeError as err:
-            raise ConfigError(f"Invalid JSON format in {filepath}: {err.msg}") from err
-        except (PermissionError, OSError) as err:
-            raise ConfigError(f"Failed to read file {filepath}: {str(err)}") from err
+                if isinstance(data, dict):
+                    self.load_from_dict(data)
+                    return True
+        except (json.JSONDecodeError, OSError):
+            pass
+        return False
 
-        return self._config
+    def load_from_env(self, prefix: str = "APP_") -> None:
+        """Override configuration options using environment variables."""
+        for key, value in os.environ.items():
+            if key.startswith(prefix):
+                config_key = key[len(prefix) :].lower()
+                try:
+                    self._config[config_key] = json.loads(value)
+                except (json.JSONDecodeError, TypeError):
+                    self._config[config_key] = value
 
-    def get_env_override(self, key: str, env_var: str, cast_type: Optional[type] = None) -> Any:
-        """Safely applies an environment variable override with type casting."""
-        value = os.getenv(env_var)
-        if value is None:
-            return self._config.get(key)
+    def get(self, key: str, default: Any = None) -> Any:
+        """Retrieve a configuration value with optional default fallback."""
+        return self._config.get(key, default)
 
-        if cast_type is bool:
-            lower_val = value.strip().lower()
-            if lower_val in ("true", "1", "yes", "on"):
-                typed_val = True
-            elif lower_val in ("false", "0", "no", "off"):
-                typed_val = False
-            else:
-                raise ConfigError(f"Cannot cast env var '{env_var}' value '{value}' to bool")
-        elif cast_type is not None:
-            try:
-                typed_val = cast_type(value)
-            except (ValueError, TypeError) as err:
-                raise ConfigError(f"Failed to cast env var '{env_var}' ({value}) to {cast_type.__name__}") from err
-        else:
-            typed_val = value
+    def set(self, key: str, value: Any) -> None:
+        """Set a configuration value dynamically."""
+        self._config[key] = value
 
-        self._config[key] = typed_val
-        return typed_val
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a copy of the active configuration dictionary."""
+        return self._config.copy()
