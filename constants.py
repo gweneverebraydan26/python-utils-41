@@ -1,32 +1,30 @@
 import os
-import re
 from typing import Final
 
-# general application constants and regex patterns
-
-APP_NAME: Final[str] = "python-utils-41"
-VERSION: Final[str] = "1.0.0"
-
-# pattern for standard email validation
-EMAIL_REGEX: Final[re.Pattern] = re.compile(
-    r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
-)
-
-# default timeout configuration for network operations
-DEFAULT_TIMEOUT: Final[int] = 30
-
-# directory configuration
+# Application path configurations
 BASE_DIR: Final[str] = os.path.dirname(os.path.abspath(__file__))
-LOG_DIR: Final[str] = os.path.join(BASE_DIR, "logs")
+LOG_DIR: Final[str] = os.path.join(BASE_DIR, 'logs')
 
-# common status codes used across utility modules
-STATUS_SUCCESS: Final[int] = 200
-STATUS_ERROR: Final[int] = 500
-STATUS_UNAUTHORIZED: Final[int] = 401
+# Default operation timeouts
+DEFAULT_TIMEOUT: Final[int] = 30
+MAX_RETRIES: Final[int] = 3
 
-# environment variable keys
-ENV_VAR_DEBUG: Final[str] = "DEBUG_MODE"
-ENV_VAR_API_KEY: Final[str] = "APP_API_KEY"
+# Supported data formats
+SUPPORTED_EXTENSIONS: Final[set] = {'.json', '.yaml', '.csv', '.txt'}
 
-# list of supported file extensions for processors
-SUPPORTED_EXTENSIONS: Final[tuple] = (".json", ".yaml", ".yml", ".csv")
+# Environment defaults
+ENV_PREFIX: Final[str] = 'PYUTILS'
+DEBUG_MODE: Final[bool] = os.getenv(f'{ENV_PREFIX}_DEBUG', 'False') == 'True'
+
+# System messages
+ERROR_PREFIX: Final[str] = '[ERROR]'
+SUCCESS_PREFIX: Final[str] = '[SUCCESS]'
+
+def get_config_path(filename: str) -> str:
+    """Return full path for configuration files."""
+    return os.path.join(BASE_DIR, 'config', filename)
+
+def is_supported(filepath: str) -> bool:
+    """Check if the file extension is supported."""
+    _, ext = os.path.splitext(filepath)
+    return ext.lower() in SUPPORTED_EXTENSIONS
