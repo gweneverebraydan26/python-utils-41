@@ -1,46 +1,37 @@
-"""Data processing engine with input validation."""
+import functools
+from typing import Callable, Any, Dict
 
-from typing import Any, Dict, List
+# Cache for computed processor results to avoid redundant calculations
+_RESULT_CACHE: Dict[tuple, Any] = {}
 
+def memoize_process(func: Callable) -> Callable:
+    """Decorator to cache results of expensive operations."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs) -> Any:
+        key = (func.__name__, args, frozenset(kwargs.items()))
+        if key not in _RESULT_CACHE:
+            _RESULT_CACHE[key] = func(*args, **kwargs)
+        return _RESULT_CACHE[key]
+    return wrapper
 
-class InvalidInputError(Exception):
-    """Raised when input item fails validation checks."""
-    pass
+class DataProcessor:
+    """Handles batch processing with performance-optimized lookups."""
+    
+    def __init__(self, data: list):
+        self._data = data
 
+    @memoize_process
+    def transform_item(self, item: int) -> int:
+        """Simulates a resource-intensive transformation."""
+        result = item * item
+        for i in range(1000):
+            result += (i % 2)
+        return result
 
-class BatchProcessor:
-    """Processes batches of data records with strict validation."""
+    def process_all(self) -> list:
+        """Executes transformation on internal data set."""
+        return [self.transform_item(i) for i in self._data]
 
-    def __init__(self, required_keys: List[str]) -> None:
-        self.required_keys = required_keys
-
-    def validate_item(self, item: Any) -> Dict[str, Any]:
-        """Validates a single record against expected structure and types."""
-        if not isinstance(item, dict):
-            raise InvalidInputError(f"Expected dict, got {type(item).__name__}")
-
-        for key in self.required_keys:
-            if key not in item:
-                raise InvalidInputError(f"Missing required key: '{key}'")
-            if item[key] is None:
-                raise InvalidInputError(f"Value for '{key}' cannot be None")
-
-        return item
-
-    def process_batch(self, records: List[Any]) -> List[Dict[str, Any]]:
-        """Main processing loop with input validation for incoming records."""
-        processed_results: List[Dict[str, Any]] = []
-
-        for index, raw_record in enumerate(records):
-            try:
-                valid_record = self.validate_item(raw_record)
-                processed_item = {
-                    "id": valid_record["id"],
-                    "value": float(valid_record["value"]),
-                    "status": str(valid_record.get("status", "pending")).lower(),
-                }
-                processed_results.append(processed_item)
-            except (InvalidInputError, ValueError, TypeError) as err:
-                print(f"Skipping invalid item at index {index}: {err}")
-
-        return processed_results
+    def clear_cache(self) -> None:
+        """Resets the memoization dictionary."""
+        _RESULT_CACHE.clear()
