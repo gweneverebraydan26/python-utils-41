@@ -1,37 +1,57 @@
-class UtilsError(Exception):
-    """Base exception for python-utils-41."""
+"""Custom exceptions and error handling utilities for edge cases."""
 
-class ValidationError(UtilsError):
-    """Raised when data fails schema validation."""
+import functools
+import logging
+from typing import Any, Callable, Optional, TypeVar
 
-class ConfigurationError(UtilsError):
-    """Raised for invalid application settings."""
+logger = logging.getLogger(__name__)
 
-class ResourceNotFoundError(UtilsError):
-    """Raised when a requested resource is missing."""
+F = TypeVar("F", bound=Callable[..., Any])
 
-def handle_exception(e: Exception) -> None:
-    """Centralized error logging for library operations."""
-    if isinstance(e, UtilsError):
-        print(f"[Library Error] {e.__class__.__name__}: {str(e)}")
-    else:
-        print(f"[Unexpected Error] {type(e).__name__}: {str(e)}")
 
-def validate_input(data: any) -> bool:
-    """Ensure data is not None or empty."""
-    if data is None:
-        raise ValidationError("Input data cannot be None")
-    if hasattr(data, '__len__') and len(data) == 0:
-        raise ValidationError("Input data cannot be empty")
-    return True
+class BaseUtilError(Exception):
+    """Base exception class for python-utils utility errors."""
 
-def safe_execute(func, *args, **kwargs):
-    """Wrapper to catch and format library exceptions."""
-    try:
-        return func(*args, **kwargs)
-    except UtilsError as e:
-        handle_exception(e)
-        return None
-    except Exception as e:
-        handle_exception(e)
-        raise
+
+class ValidationError(BaseUtilError):
+    """Raised when input validation fails or data falls outside expected bounds."""
+
+    def __init__(self, message: str, field_name: Optional[str] = None, value: Any = None):
+        super().__init__(message)
+        self.field_name = field_name
+        self.value = value
+
+
+class ProcessingError(BaseUtilError):
+    """Raised when processing fails due to unhandled edge cases or state issues."""
+
+
+def safe_execute(
+    default_return: Any = None,
+    catch_exceptions: tuple = (Exception,),
+    log_errors: bool = True,
+) -> Callable[[F], F]:
+    """Decorator to safely execute functions and handle unexpected edge cases."""
+
+    def decorator(func: F) -> F:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            try:
+                return func(*args, **kwargs)
+            except catch_exceptions as err:
+                if log_errors:
+                    logger.warning("Edge case captured in %s: %s", func.__name__, err)
+                return default_return
+
+        return wrapper  # type: ignore
+
+    return decorator
+
+
+def ensure_non_null(value: Any, name: str = "value") -> Any:
+    """Validate that a given value is not None or empty string."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        raise ValidationError(
+            f"Parameter '{name}' cannot be null or empty", field_name=name, value=value
+        )
+    return value
