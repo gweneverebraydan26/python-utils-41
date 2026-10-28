@@ -1,33 +1,34 @@
 import logging
 from logging.handlers import RotatingFileHandler
-import os
+import sys
 
-def setup_logger(name: str, log_file: str, level: int = logging.INFO) -> logging.Logger:
-    """Configures a rotating file logger."""
+def setup_logger(name='app_logger', log_file='app.log', level=logging.INFO):
+    """
+    Configures a logger with file rotation support.
+    Max file size: 5MB, keep 3 backup files.
+    """
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    # Prevent duplicate handlers if logger is re-initialized
+    # Prevent duplicate handlers if function called multiple times
     if not logger.handlers:
-        # 5MB per file, keep 3 backup files
-        handler = RotatingFileHandler(
-            log_file, 
-            maxBytes=5 * 1024 * 1024, 
-            backupCount=3
-        )
-        
         formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        
-        # Optional console output
-        console = logging.StreamHandler()
-        console.setFormatter(formatter)
-        logger.addHandler(console)
+
+        # Rotating file handler configuration
+        file_handler = RotatingFileHandler(
+            log_file, 
+            maxBytes=5*1024*1024, 
+            backupCount=3
+        )
+        file_handler.setFormatter(formatter)
+
+        # Console stream handler
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
+
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
 
     return logger
-
-# Example usage for project-wide logging
-app_logger = setup_logger('python-utils-41', 'app.log')
