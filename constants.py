@@ -1,30 +1,48 @@
 import os
-from typing import Final
+import logging
+from typing import Any, Final
 
-# Application path configurations
-BASE_DIR: Final[str] = os.path.dirname(os.path.abspath(__file__))
-LOG_DIR: Final[str] = os.path.join(BASE_DIR, 'logs')
+# Configure logger for module diagnostics
+logger = logging.getLogger(__name__)
 
-# Default operation timeouts
-DEFAULT_TIMEOUT: Final[int] = 30
-MAX_RETRIES: Final[int] = 3
+def get_env_constant(key: str, default: Any = None) -> Any:
+    """
+    Safely retrieve environment variables with type fallback.
+    Handles missing keys or empty environment configurations.
+    """
+    try:
+        value = os.environ.get(key)
+        if value is None:
+            if default is None:
+                raise KeyError(f"Environment variable '{key}' is missing")
+            return default
+        return value
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving constant {key}: {e}")
+        return default
 
-# Supported data formats
-SUPPORTED_EXTENSIONS: Final[set] = {'.json', '.yaml', '.csv', '.txt'}
+# Application-wide default constraints
+MAX_RETRY_ATTEMPTS: Final[int] = 3
+TIMEOUT_SECONDS: Final[int] = 30
+DEFAULT_ENCODING: Final[str] = "utf-8"
 
-# Environment defaults
-ENV_PREFIX: Final[str] = 'PYUTILS'
-DEBUG_MODE: Final[bool] = os.getenv(f'{ENV_PREFIX}_DEBUG', 'False') == 'True'
+# Validate critical system configuration
+if not isinstance(MAX_RETRY_ATTEMPTS, int) or MAX_RETRY_ATTEMPTS < 0:
+    logger.warning("Invalid MAX_RETRY_ATTEMPTS, resetting to 0")
+    MAX_RETRY_ATTEMPTS = 0
 
-# System messages
-ERROR_PREFIX: Final[str] = '[ERROR]'
-SUCCESS_PREFIX: Final[str] = '[SUCCESS]'
+class ConfigError(Exception):
+    """
+    Custom exception for configuration failures.
+    """
+    pass
 
-def get_config_path(filename: str) -> str:
-    """Return full path for configuration files."""
-    return os.path.join(BASE_DIR, 'config', filename)
-
-def is_supported(filepath: str) -> bool:
-    """Check if the file extension is supported."""
-    _, ext = os.path.splitext(filepath)
-    return ext.lower() in SUPPORTED_EXTENSIONS
+def validate_config(config_dict: dict) -> bool:
+    """
+    Ensure required keys exist within the config object.
+    """
+    required = ['VERSION', 'DEBUG_MODE']
+    for key in required:
+        if key not in config_dict:
+            raise ConfigError(f"Missing required configuration: {key}")
+    return True
