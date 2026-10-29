@@ -1,37 +1,32 @@
-import functools
-from typing import Callable, Any, Dict
+import json
+from typing import Any, Dict, List, Optional
+from pathlib import Path
 
-# Cache for computed processor results to avoid redundant calculations
-_RESULT_CACHE: Dict[tuple, Any] = {}
+def read_json_file(file_path: str) -> Dict[str, Any]:
+    """Load and parse a JSON file safely."""
+    path = Path(file_path)
+    if not path.exists():
+        return {}
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
-def memoize_process(func: Callable) -> Callable:
-    """Decorator to cache results of expensive operations."""
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs) -> Any:
-        key = (func.__name__, args, frozenset(kwargs.items()))
-        if key not in _RESULT_CACHE:
-            _RESULT_CACHE[key] = func(*args, **kwargs)
-        return _RESULT_CACHE[key]
-    return wrapper
+def flatten_dict(d: Dict[str, Any], parent_key: str = '', sep: str = '_') -> Dict[str, Any]:
+    """Flatten nested dictionary into single level."""
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
 
-class DataProcessor:
-    """Handles batch processing with performance-optimized lookups."""
-    
-    def __init__(self, data: list):
-        self._data = data
+def chunk_list(data: List[Any], size: int) -> List[List[Any]]:
+    """Split a list into smaller balanced chunks."""
+    if size <= 0:
+        return [data]
+    return [data[i:i + size] for i in range(0, len(data), size)]
 
-    @memoize_process
-    def transform_item(self, item: int) -> int:
-        """Simulates a resource-intensive transformation."""
-        result = item * item
-        for i in range(1000):
-            result += (i % 2)
-        return result
-
-    def process_all(self) -> list:
-        """Executes transformation on internal data set."""
-        return [self.transform_item(i) for i in self._data]
-
-    def clear_cache(self) -> None:
-        """Resets the memoization dictionary."""
-        _RESULT_CACHE.clear()
+def sanitize_string(text: str) -> str:
+    """Remove non-alphanumeric characters from string."""
+    return ''.join(c for c in text if c.isalnum() or c.isspace()).strip()
