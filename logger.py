@@ -1,34 +1,29 @@
 import logging
-from logging.handlers import RotatingFileHandler
-import os
+import sys
+from typing import Optional
 
-def setup_logger(name='app_logger', log_file='app.log', level=logging.INFO):
-    """Initializes a rotating file logger for the application."""
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
+class AppLogger:
+    """Standardized logger configuration for python-utils-41."""
+    
+    def __init__(self, name: str, level: int = logging.INFO):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(level)
+        self._setup_handler()
 
-    # Prevent duplicate handlers if function is called multiple times
-    if not logger.handlers:
-        # 5MB per file, keep 3 historical backups
-        handler = RotatingFileHandler(
-            log_file, 
-            maxBytes=5 * 1024 * 1024, 
-            backupCount=3
-        )
-        
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+    def _setup_handler(self) -> None:
+        """Configure stdout handler with a consistent format."""
+        if not self.logger.handlers:
+            formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
+            handler = logging.StreamHandler(sys.stdout)
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
 
-        # Optional: Log to console as well
-        console = logging.StreamHandler()
-        console.setFormatter(formatter)
-        logger.addHandler(console)
+    def get_logger(self) -> logging.Logger:
+        """Return the underlying configured logger instance."""
+        return self.logger
 
-    return logger
-
-if __name__ == '__main__':
-    log = setup_logger()
-    log.info('logger initialization successful')
+def get_module_logger(name: str) -> logging.Logger:
+    """Factory function for consistent module-level logging."""
+    return AppLogger(name).get_logger()
