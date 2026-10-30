@@ -1,36 +1,47 @@
-import time
-import functools
-import logging
+"""General utility functions for data manipulation and formatting."""
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+import re
+from typing import Any, Dict, List, Optional
 
-def retry_network_operation(max_retries=3, delay=1.0, backoff=2.0):
-    """Decorator for retrying functions on exception."""
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            attempts = 0
-            current_delay = delay
-            while attempts < max_retries:
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    attempts += 1
-                    if attempts >= max_retries:
-                        logger.error(f"Final attempt failed for {func.__name__}: {e}")
-                        raise
-                    
-                    logger.warning(f"Attempt {attempts} failed for {func.__name__}. Retrying in {current_delay}s...")
-                    time.sleep(current_delay)
-                    current_delay *= backoff
-            return None
-        return wrapper
-    return decorator
 
-@retry_network_operation(max_retries=3, delay=2.0)
-def fetch_data(url):
-    """Example function performing a simulated network call."""
-    # Placeholder for actual request logic like requests.get
-    logger.info(f"Fetching data from {url}")
-    raise ConnectionError("Service unavailable")
+def deep_merge_dicts(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively merge two dictionaries into a new dictionary."""
+    result = dict1.copy()
+    for key, value in dict2.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = deep_merge_dicts(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def flatten_iterable(items: List[Any]) -> List[Any]:
+    """Flatten arbitrarily nested lists or tuples into a single list."""
+    flat_list = []
+    for item in items:
+        if isinstance(item, (list, tuple)):
+            flat_list.extend(flatten_iterable(list(item)))
+        else:
+            flat_list.append(item)
+    return flat_list
+
+
+def safe_cast(val: Any, to_type: type, default: Optional[Any] = None) -> Any:
+    """Safely cast a value to a given type, returning default on failure."""
+    try:
+        return to_type(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def truncate_string(text: str, max_length: int = 100, suffix: str = "...") -> str:
+    """Truncate a string to a max length and append suffix if truncated."""
+    if len(text) <= max_length:
+        return text
+    return text[: max_length - len(suffix)].rstrip() + suffix
+
+
+def sanitize_key(key: str) -> str:
+    """Sanitize a string to be used as a clean variable or dict key."""
+    clean = re.sub(r"[^\w\s-]", "", key).strip().lower()
+    return re.sub(r"[-\s]+", "_", clean)
