@@ -1,42 +1,62 @@
-import logging
-import os
-from typing import Any, Dict, Optional
+"""Data payload and event handler module for general utilities."""
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from typing import Any, Callable, Dict, List, Optional, TypeVar
+
+T = TypeVar("T")
+
 
 class DataHandler:
-    """Manages data processing and lifecycle operations."""
+    """Processes and transforms data payloads using registered pipelines."""
 
-    def __init__(self, storage_path: str = "./data"):
-        self.storage_path = storage_path
-        self._ensure_directory()
+    def __init__(self, name: str = "default") -> None:
+        """Initialize the data handler with a name and empty middleware pipeline.
 
-    def _ensure_directory(self) -> None:
-        if not os.path.exists(self.storage_path):
-            os.makedirs(self.storage_path)
+        Args:
+            name: Identifier for this handler instance.
+        """
+        self.name: str = name
+        self._transformers: List[Callable[[Dict[str, Any]], Dict[str, Any]]] = []
 
-    def process_payload(self, data: Dict[str, Any]) -> bool:
-        """Validates and persists incoming dictionary payloads."""
+    def register_transformer(
+        self, func: Callable[[Dict[str, Any]], Dict[str, Any]]
+    ) -> None:
+        """Register a transformation function to be applied sequentially.
+
+        Args:
+            func: Function taking a payload dict and returning transformed dict.
+        """
+        self._transformers.append(func)
+
+    def process_payload(
+        self, payload: Dict[str, Any], fallback: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Process a single payload dictionary through registered transformers.
+
+        Args:
+            payload: The incoming payload data.
+            fallback: Optional dictionary to return if pipeline execution fails.
+
+        Returns:
+            Transformed dictionary payload or fallback value.
+        """
+        if not isinstance(payload, dict):
+            return fallback if fallback is not None else {}
+
+        result = payload.copy()
         try:
-            if not data or not isinstance(data, dict):
-                raise ValueError("Invalid payload format")
-            
-            target = os.path.join(self.storage_path, "last_run.log")
-            with open(target, "a", encoding="utf-8") as f:
-                f.write(str(data) + "\n")
-            
-            logger.info(f"Successfully processed payload: {list(data.keys())}")
-            return True
-        except Exception as e:
-            logger.error(f"Processing failure: {e}")
-            return False
+            for transformer in self._transformers:
+                result = transformer(result)
+            return result
+        except Exception:
+            return fallback if fallback is not None else {}
 
-    def cleanup_old_logs(self, max_files: int = 5) -> None:
-        """Prunes storage directory to keep footprint low."""
-        files = [os.path.join(self.storage_path, f) for f in os.listdir(self.storage_path)]
-        if len(files) > max_files:
-            files.sort(key=os.path.getmtime)
-            for f in files[:-max_files]:
-                os.remove(f)
-                logger.info(f"Cleaned up stale file: {f}")
+    def process_batch(self, batch: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Process multiple dictionary payloads in sequence.
+
+        Args:
+            batch: List of input dictionaries to process.
+
+        Returns:
+            List of successfully processed dictionary payloads.
+        """
+        return [self.process_payload(item) for item in batch if isinstance(item, dict)]
