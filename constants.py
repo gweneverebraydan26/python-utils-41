@@ -1,48 +1,55 @@
-import os
-import logging
-from typing import Any, Final
+"""Module defining global application constants, defaults, and formats."""
 
-# Configure logger for module diagnostics
-logger = logging.getLogger(__name__)
+from enum import Enum, unique
+from typing import Final, Dict, Any
 
-def get_env_constant(key: str, default: Any = None) -> Any:
-    """
-    Safely retrieve environment variables with type fallback.
-    Handles missing keys or empty environment configurations.
-    """
-    try:
-        value = os.environ.get(key)
-        if value is None:
-            if default is None:
-                raise KeyError(f"Environment variable '{key}' is missing")
-            return default
-        return value
-    except Exception as e:
-        logger.error(f"Unexpected error retrieving constant {key}: {e}")
-        return default
-
-# Application-wide default constraints
-MAX_RETRY_ATTEMPTS: Final[int] = 3
-TIMEOUT_SECONDS: Final[int] = 30
+# General Application Metadata
+APP_NAME: Final[str] = "python-utils-41"
 DEFAULT_ENCODING: Final[str] = "utf-8"
+BUFFER_SIZE: Final[int] = 8192
 
-# Validate critical system configuration
-if not isinstance(MAX_RETRY_ATTEMPTS, int) or MAX_RETRY_ATTEMPTS < 0:
-    logger.warning("Invalid MAX_RETRY_ATTEMPTS, resetting to 0")
-    MAX_RETRY_ATTEMPTS = 0
+# Timeouts and Limits (in seconds/units)
+DEFAULT_TIMEOUT: Final[float] = 30.0
+MAX_RETRIES: Final[int] = 3
+BACKOFF_FACTOR: Final[float] = 1.5
 
-class ConfigError(Exception):
-    """
-    Custom exception for configuration failures.
-    """
-    pass
+# Standard Date & Time Formats
+ISO_DATETIME_FORMAT: Final[str] = "%Y-%m-%dT%H:%M:%SZ"
+LOG_DATETIME_FORMAT: Final[str] = "%Y-%m-%d %H:%M:%S"
+SIMPLE_DATE_FORMAT: Final[str] = "%Y-%m-%d"
 
-def validate_config(config_dict: dict) -> bool:
-    """
-    Ensure required keys exist within the config object.
-    """
-    required = ['VERSION', 'DEBUG_MODE']
-    for key in required:
-        if key not in config_dict:
-            raise ConfigError(f"Missing required configuration: {key}")
-    return True
+# File Processing Extensions
+SUPPORTED_TEXT_EXTENSIONS: Final[tuple] = (".txt", ".md", ".json", ".csv", ".yaml", ".yml")
+SUPPORTED_IMAGE_EXTENSIONS: Final[tuple] = (".png", ".jpg", ".jpeg", ".webp", ".gif")
+
+
+@unique
+class Environment(str, Enum):
+    """Supported execution environments."""
+
+    DEVELOPMENT = "development"
+    STAGING = "staging"
+    PRODUCTION = "production"
+    TESTING = "testing"
+
+
+@unique
+class LogLevel(str, Enum):
+    """Standard logging level strings."""
+
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+# Default System Configuration Values
+DEFAULT_CONFIG: Final[Dict[str, Any]] = {
+    "env": Environment.DEVELOPMENT.value,
+    "debug": False,
+    "log_level": LogLevel.INFO.value,
+    "timeout": DEFAULT_TIMEOUT,
+    "max_retries": MAX_RETRIES,
+    "encoding": DEFAULT_ENCODING,
+}
