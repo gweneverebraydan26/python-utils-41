@@ -1,62 +1,62 @@
-"""Data payload and event handler module for general utilities."""
+"""General utility handlers and helper functions."""
 
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+import time
+from typing import Any, Callable, Iterable, List, TypeVar
 
 T = TypeVar("T")
 
 
-class DataHandler:
-    """Processes and transforms data payloads using registered pipelines."""
+def safe_get(data: dict, keys: str, default: Any = None) -> Any:
+    """Retrieve nested value from a dictionary using dot notation."""
+    current = data
+    for key in keys.split("."):
+        if isinstance(current, dict) and key in current:
+            current = current[key]
+        else:
+            return default
+    return current
 
-    def __init__(self, name: str = "default") -> None:
-        """Initialize the data handler with a name and empty middleware pipeline.
 
-        Args:
-            name: Identifier for this handler instance.
-        """
-        self.name: str = name
-        self._transformers: List[Callable[[Dict[str, Any]], Dict[str, Any]]] = []
+def chunk_iterable(iterable: Iterable[T], chunk_size: int) -> List[List[T]]:
+    """Split an iterable into chunks of specified size."""
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be greater than 0")
 
-    def register_transformer(
-        self, func: Callable[[Dict[str, Any]], Dict[str, Any]]
-    ) -> None:
-        """Register a transformation function to be applied sequentially.
+    items = list(iterable)
+    return [items[i : i + chunk_size] for i in range(0, len(items), chunk_size)]
 
-        Args:
-            func: Function taking a payload dict and returning transformed dict.
-        """
-        self._transformers.append(func)
 
-    def process_payload(
-        self, payload: Dict[str, Any], fallback: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """Process a single payload dictionary through registered transformers.
-
-        Args:
-            payload: The incoming payload data.
-            fallback: Optional dictionary to return if pipeline execution fails.
-
-        Returns:
-            Transformed dictionary payload or fallback value.
-        """
-        if not isinstance(payload, dict):
-            return fallback if fallback is not None else {}
-
-        result = payload.copy()
+def retry_operation(
+    func: Callable[[], T],
+    retries: int = 3,
+    delay: float = 1.0,
+    backoff: float = 2.0,
+    exceptions: tuple = (Exception,),
+) -> T:
+    """Retry a function call with exponential backoff."""
+    attempt = 0
+    current_delay = delay
+    while attempt < retries:
         try:
-            for transformer in self._transformers:
-                result = transformer(result)
-            return result
-        except Exception:
-            return fallback if fallback is not None else {}
+            return func()
+        except exceptions as err:
+            attempt += 1
+            if attempt >= retries:
+                raise err
+            time.sleep(current_delay)
+            current_delay *= backoff
 
-    def process_batch(self, batch: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Process multiple dictionary payloads in sequence.
 
-        Args:
-            batch: List of input dictionaries to process.
-
-        Returns:
-            List of successfully processed dictionary payloads.
-        """
-        return [self.process_payload(item) for item in batch if isinstance(item, dict)]
+def parse_boolean(val: Any, default: bool = False) -> bool:
+    """Convert string or numeric representations to boolean."""
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, (int, float)):
+        return bool(val)
+    if isinstance(val, str):
+        cleaned = val.strip().lower()
+        if cleaned in ("true", "1", "yes", "y", "on", "t"):
+            return True
+        if cleaned in ("false", "0", "no", "n", "off", "f"):
+            return False
+    return default
