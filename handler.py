@@ -1,35 +1,35 @@
+import time
+import functools
 import logging
-from typing import Any, Optional, Callable
 
 logger = logging.getLogger(__name__)
 
-class DataHandler:
-    """Utility for safely processing data with error boundaries."""
+def retry_network_op(retries=3, delay=1, backoff=2, exceptions=(Exception,)):
+    """
+    decorator for retrying network operations with exponential backoff
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            current_delay = delay
+            for attempt in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    if attempt == retries - 1:
+                        logger.error(f"failed after {retries} attempts: {e}")
+                        raise
+                    
+                    logger.warning(f"attempt {attempt + 1} failed, retrying in {current_delay}s...")
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+        return wrapper
+    return decorator
 
-    def __init__(self, fallback: Any = None):
-        self.fallback = fallback
-
-    def execute(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
-        """Executes a callable with comprehensive exception handling."""
-        try:
-            if not callable(func):
-                raise ValueError(f"Provided object {type(func)} is not callable")
-            
-            return func(*args, **kwargs)
-            
-        except (TypeError, ValueError) as e:
-            logger.error(f"Input validation error: {e}")
-            return self.fallback
-            
-        except KeyError as e:
-            logger.error(f"Missing required data key: {e}")
-            return self.fallback
-            
-        except Exception as e:
-            logger.critical(f"Unexpected system failure: {e}", exc_info=True)
-            return self.fallback
-
-def safe_execute(func: Callable, *args: Any, **kwargs: Any) -> Optional[Any]:
-    """Functional wrapper for quick error-resilient task execution."""
-    handler = DataHandler(fallback=None)
-    return handler.execute(func, *args, **kwargs)
+@retry_network_op(retries=3, delay=2)
+def fetch_data(url):
+    """
+    example usage: simulate a volatile network request
+    """
+    # implementation logic for network request here
+    pass
