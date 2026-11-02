@@ -1,34 +1,32 @@
 class UtilityError(Exception):
-    """Base exception for python-utils-41."""
-
-class ValidationError(UtilityError):
-    """Raised when data fails schema validation."""
+    """Base exception for python-utils-41 package."""
+    pass
 
 class ConfigurationError(UtilityError):
-    """Raised for invalid application configuration."""
+    """Raised when configuration values are missing or invalid."""
+    pass
 
 class ProcessingError(UtilityError):
-    """Raised during core operation failures."""
+    """Raised when a data transformation fails."""
+    pass
 
-def handle_execution_context(func):
-    """Decorator to wrap operations with error handling."""
+def handle_exceptions(func):
+    """Decorator to wrap functions in standard error handling."""
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except (ValueError, TypeError) as e:
-            raise ValidationError(f"Data validation failed: {str(e)}") from e
-        except KeyError as e:
-            raise ConfigurationError(f"Missing required configuration: {str(e)}") from e
+        except (ValueError, TypeError, KeyError) as e:
+            raise ProcessingError(f"Processing failed: {str(e)}") from e
         except Exception as e:
-            # Log unexpected errors here if logging is available
-            raise ProcessingError(f"Unexpected error occurred: {str(e)}") from e
+            # Log unexpected errors before re-raising
+            print(f"Critical failure in {func.__name__}: {str(e)}")
+            raise
     return wrapper
 
-def safe_execute(operation, *args, **kwargs):
-    """Functional interface for safe operation execution."""
-    try:
-        return operation(*args, **kwargs)
-    except UtilityError:
-        raise
-    except Exception as e:
-        raise ProcessingError("Core operation failure") from e
+def validate_input(data):
+    """Checks if input data is non-empty before processing."""
+    if data is None:
+        raise ProcessingError("Input data cannot be None")
+    if not isinstance(data, (dict, list)):
+        raise ProcessingError("Invalid data format, expected dict or list")
+    return True
