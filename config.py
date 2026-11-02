@@ -3,49 +3,55 @@ import os
 from typing import Any, Dict, Optional
 
 
-class ConfigLoader:
-    """Manages application configuration with default fallback values."""
+class ConfigError(Exception):
+    """Custom exception raised for configuration parsing and loading errors."""
+    pass
+
+
+class ConfigManager:
+    """Manages application configuration with safe edge-case handling."""
 
     def __init__(self, defaults: Optional[Dict[str, Any]] = None):
         self._config: Dict[str, Any] = defaults.copy() if defaults else {}
 
-    def load_from_dict(self, data: Dict[str, Any]) -> None:
-        """Update configuration settings from a dictionary."""
-        self._config.update(data)
+    def load_from_file(self, filepath: str) -> bool:
+        """Loads configuration from a JSON file with error boundary checks."""
+        if not isinstance(filepath, str) or not filepath.strip():
+            raise ConfigError("Filepath must be a non-empty string.")
 
-    def load_from_json(self, filepath: str) -> bool:
-        """Load configuration from a JSON file if it exists."""
         if not os.path.exists(filepath):
-            return False
+            raise ConfigError(f"Configuration file not found: '{filepath}'")
 
         try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, dict):
-                    self.load_from_dict(data)
-                    return True
-        except (json.JSONDecodeError, OSError):
-            pass
-        return False
+            with open(filepath, "r", encoding="utf-8") as file:
+                data = json.load(file)
+                if not isinstance(data, dict):
+                    raise ConfigError("Root JSON structure must be a key-value object.")
+                self._config.update(data)
+                return True
+        except json.JSONDecodeError as err:
+            raise ConfigError(f"Malformed JSON content: {err}") from err
+        except (PermissionError, OSError) as err:
+            raise ConfigError(f"Unable to read config file: {err}") from err
 
-    def load_from_env(self, prefix: str = "APP_") -> None:
-        """Override configuration options using environment variables."""
-        for key, value in os.environ.items():
-            if key.startswith(prefix):
-                config_key = key[len(prefix) :].lower()
-                try:
-                    self._config[config_key] = json.loads(value)
-                except (json.JSONDecodeError, TypeError):
-                    self._config[config_key] = value
+    def get(self, key_path: str, default: Any = None, target_type: Optional[type] = None) -> Any:
+        """Safely retrieves a nested setting using dot notation with optional casting."""
+        if not isinstance(key_path, str) or not key_path.strip():
+            return default
 
-    def get(self, key: str, default: Any = None) -> Any:
-        """Retrieve a configuration value with optional default fallback."""
-        return self._config.get(key, default)
+        keys = key_path.split(".")
+        current: Any = self._config
 
-    def set(self, key: str, value: Any) -> None:
-        """Set a configuration value dynamically."""
-        self._config[key] = value
+        for key in keys:
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+            else:
+                return default
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Return a copy of the active configuration dictionary."""
-        return self._config.copy()
+        if target_type is not None:
+            try:
+                return target_type(current)
+            except (ValueError, TypeError):
+                return default
+
+        return current
