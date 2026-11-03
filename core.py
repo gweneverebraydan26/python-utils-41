@@ -1,76 +1,36 @@
-import time
 import functools
-from typing import Any, Callable, Dict, Tuple, Optional
+from typing import Any, List, Tuple
 
 
-class TimedLRUCache:
-    """An LRU cache implementation with time-to-live expiration."""
+class FastTaskRunner:
+    """Core task runner optimized with caching and execution batching."""
 
-    def __init__(self, maxsize: int = 128, ttl: float = 60.0) -> None:
-        self.maxsize = maxsize
-        self.ttl = ttl
-        self._cache: Dict[Any, Tuple[Any, float]] = {}
+    def __init__(self, cache_size: int = 128) -> None:
+        self.cache_size = cache_size
+        # Decorate internal execution function with LRU cache for fast repeated lookups
+        self._memoized_exec = functools.lru_cache(maxsize=cache_size)(
+            self._compute_task
+        )
 
-    def get(self, key: Any) -> Optional[Any]:
-        if key not in self._cache:
-            return None
+    @staticmethod
+    def _compute_task(task_name: str, payload_hash: int, data: str) -> str:
+        """Internal compute method that performs CPU-bound string transformations."""
+        reversed_str = data[::-1]
+        return f"{task_name}:{payload_hash}:{reversed_str}"
 
-        value, timestamp = self._cache[key]
-        if time.time() - timestamp > self.ttl:
-            del self._cache[key]
-            return None
+    def run(self, task_name: str, data: str) -> str:
+        """Execute a task using the cached internal compute method."""
+        payload_hash = hash(data)
+        return self._memoized_exec(task_name, payload_hash, data)
 
-        return value
+    def batch_run(self, tasks: List[Tuple[str, str]]) -> List[str]:
+        """Process multiple task payloads sequentially using cached lookups."""
+        return [self.run(task_name, data) for task_name, data in tasks]
 
-    def set(self, key: Any, value: Any) -> None:
-        if len(self._cache) >= self.maxsize and key not in self._cache:
-            oldest_key = next(iter(self._cache))
-            del self._cache[oldest_key]
-        self._cache[key] = (value, time.time())
+    def cache_info(self) -> Any:
+        """Return current cache statistics for monitoring optimization efficiency."""
+        return self._memoized_exec.cache_info()
 
-    def clear(self) -> None:
-        self._cache.clear()
-
-
-def memoize_ttl(ttl: float = 60.0, maxsize: int = 128) -> Callable:
-    """Decorator to cache function execution results with time-based invalidation."""
-    cache = TimedLRUCache(maxsize=maxsize, ttl=ttl)
-
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            key = (args, tuple(sorted(kwargs.items())))
-            cached_result = cache.get(key)
-            if cached_result is not None:
-                return cached_result
-
-            result = func(*args, **kwargs)
-            cache.set(key, result)
-            return result
-
-        wrapper.cache_clear = cache.clear  # type: ignore
-        return wrapper
-
-    return decorator
-
-
-class CoreProcessor:
-    """High-performance batch processing core engine."""
-
-    def __init__(self, batch_size: int = 100) -> None:
-        self.batch_size = batch_size
-
-    @memoize_ttl(ttl=300.0, maxsize=256)
-    def compute_heavy_transform(self, item_id: str, value: float) -> float:
-        """Simulates expensive transformation optimized with TTL caching."""
-        return round((value ** 1.5) / 3.14159, 4)
-
-    def process_batch(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Processes a sequence of payload items efficiently using caching."""
-        results = []
-        for item in items:
-            transformed = self.compute_heavy_transform(
-                item["id"], float(item["value"])
-            )
-            results.append({"id": item["id"], "result": transformed})
-        return results
+    def clear_cache(self) -> None:
+        """Clear cached computation results to free memory."""
+        self._memoized_exec.cache_clear()
