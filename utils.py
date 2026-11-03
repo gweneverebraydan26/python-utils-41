@@ -1,47 +1,45 @@
-"""General utility functions for data manipulation and formatting."""
+from typing import List, Any, Optional, Dict
+import datetime
 
-import re
-from typing import Any, Dict, List, Optional
+def format_data(items: List[Dict[str, Any]], key: str) -> List[Any]:
+    """Extract values from list of dicts based on key.
 
+    Args:
+        items: List of dictionaries to parse.
+        key: The dictionary key to extract.
 
-def deep_merge_dicts(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
-    """Recursively merge two dictionaries into a new dictionary."""
-    result = dict1.copy()
-    for key, value in dict2.items():
-        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-            result[key] = deep_merge_dicts(result[key], value)
-        else:
-            result[key] = value
-    return result
+    Returns:
+        A list of values associated with the specified key.
+    """
+    return [item[key] for item in items if key in item]
 
+def generate_timestamp() -> str:
+    """Create a string representation of current UTC time.
 
-def flatten_iterable(items: List[Any]) -> List[Any]:
-    """Flatten arbitrarily nested lists or tuples into a single list."""
-    flat_list = []
-    for item in items:
-        if isinstance(item, (list, tuple)):
-            flat_list.extend(flatten_iterable(list(item)))
-        else:
-            flat_list.append(item)
-    return flat_list
+    Returns:
+        ISO format string of the current UTC timestamp.
+    """
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
+def filter_none(data: Dict[str, Optional[Any]]) -> Dict[str, Any]:
+    """Remove keys with None values from a dictionary.
 
-def safe_cast(val: Any, to_type: type, default: Optional[Any] = None) -> Any:
-    """Safely cast a value to a given type, returning default on failure."""
-    try:
-        return to_type(val)
-    except (ValueError, TypeError):
-        return default
+    Args:
+        data: Input dictionary to filter.
 
+    Returns:
+        A new dictionary excluding None values.
+    """
+    return {k: v for k, v in data.items() if v is not None}
 
-def truncate_string(text: str, max_length: int = 100, suffix: str = "...") -> str:
-    """Truncate a string to a max length and append suffix if truncated."""
-    if len(text) <= max_length:
-        return text
-    return text[: max_length - len(suffix)].rstrip() + suffix
+def chunk_list(items: List[Any], size: int) -> List[List[Any]]:
+    """Split a list into smaller sub-lists of a defined size.
 
+    Args:
+        items: The list to be divided.
+        size: The maximum size of each chunk.
 
-def sanitize_key(key: str) -> str:
-    """Sanitize a string to be used as a clean variable or dict key."""
-    clean = re.sub(r"[^\w\s-]", "", key).strip().lower()
-    return re.sub(r"[-\s]+", "_", clean)
+    Returns:
+        A list of list chunks.
+    """
+    return [items[i:i + size] for i in range(0, len(items), size)]
