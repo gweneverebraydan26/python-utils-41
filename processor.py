@@ -1,32 +1,48 @@
-import json
-from typing import Any, Dict, List, Optional
-from pathlib import Path
+from typing import List, Dict, Any, Optional
 
-def read_json_file(file_path: str) -> Dict[str, Any]:
-    """Load and parse a JSON file safely."""
-    path = Path(file_path)
-    if not path.exists():
-        return {}
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+class DataProcessor:
+    """Handles transformation of dictionary-based datasets."""
 
-def flatten_dict(d: Dict[str, Any], parent_key: str = '', sep: str = '_') -> Dict[str, Any]:
-    """Flatten nested dictionary into single level."""
-    items = []
-    for k, v in d.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
+    def __init__(self, settings: Optional[Dict[str, Any]] = None) -> None:
+        self.settings: Dict[str, Any] = settings or {}
 
-def chunk_list(data: List[Any], size: int) -> List[List[Any]]:
-    """Split a list into smaller balanced chunks."""
-    if size <= 0:
-        return [data]
-    return [data[i:i + size] for i in range(0, len(data), size)]
+    def filter_keys(self, data: List[Dict[str, Any]], allowed: List[str]) -> List[Dict[str, Any]]:
+        """
+        Filters dictionaries to retain only specified keys.
 
-def sanitize_string(text: str) -> str:
-    """Remove non-alphanumeric characters from string."""
-    return ''.join(c for c in text if c.isalnum() or c.isspace()).strip()
+        Args:
+            data: List of dictionaries to process.
+            allowed: List of keys to preserve.
+
+        Returns:
+            A filtered list of dictionaries.
+        """
+        return [{k: v for k, v in item.items() if k in allowed} for item in data]
+
+    def flatten_values(self, data: List[Dict[str, Any]]) -> List[Any]:
+        """
+        Extracts all values from a list of dictionaries into a flat list.
+
+        Args:
+            data: List of dictionaries to flatten.
+
+        Returns:
+            A single list containing all values.
+        """
+        results: List[Any] = []
+        for item in data:
+            results.extend(item.values())
+        return results
+
+    def process_batch(self, data: List[Dict[str, Any]], key: str) -> List[Any]:
+        """
+        Extracts values for a specific key across the batch.
+
+        Args:
+            data: Input data list.
+            key: Key to extract.
+
+        Returns:
+            List of values found for the given key.
+        """
+        return [item[key] for item in data if key in item]
