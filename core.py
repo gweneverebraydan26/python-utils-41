@@ -1,37 +1,40 @@
-import functools
-import time
-from typing import Callable, Any, Dict
+import logging
+from typing import Any, Optional, Callable
 
-# Cache for storing expensive function results to optimize execution speed
-_memoization_cache: Dict[tuple, Any] = {}
+logger = logging.getLogger(__name__)
 
-def memoize(func: Callable) -> Callable:
-    """Decorator for caching return values of expensive calls."""
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs) -> Any:
-        key = (func.__name__, args, frozenset(kwargs.items()))
-        if key not in _memoization_cache:
-            _memoization_cache[key] = func(*args, **kwargs)
-        return _memoization_cache[key]
-    return wrapper
+def safe_execute(func: Callable, *args: Any, default: Any = None, **kwargs: Any) -> Any:
+    """Execute a callable with broad exception handling and logging."""
+    try:
+        return func(*args, **kwargs)
+    except (ValueError, TypeError, AttributeError) as e:
+        logger.error(f"Execution error in {func.__name__}: {str(e)}")
+        return default
+    except Exception as e:
+        logger.critical(f"Unexpected system failure: {str(e)}", exc_info=True)
+        raise
 
-class BatchProcessor:
-    """Processor class optimized for memory-efficient iteration."""
-    def __init__(self, data: list, chunk_size: int = 100):
-        self.data = data
-        self.chunk_size = chunk_size
+def validate_payload(data: Any, schema_keys: list) -> bool:
+    """Check dictionary keys against schema with graceful failure."""
+    if not isinstance(data, dict):
+        logger.warning("Invalid input type: expected dictionary")
+        return False
+    
+    try:
+        return all(key in data for key in schema_keys)
+    except TypeError:
+        return False
 
-    def process_stream(self):
-        """Yield chunks using a generator to reduce memory footprint."""
-        for i in range(0, len(self.data), self.chunk_size):
-            yield self.data[i : i + self.chunk_size]
-
-def benchmark_execution(func: Callable):
-    """Execution time tracking for performance diagnostics."""
-    def wrapper(*args, **kwargs):
-        start = time.perf_counter()
-        result = func(*args, **kwargs)
-        end = time.perf_counter()
-        print(f"Execution of {func.__name__} took {end - start:.4f}s")
-        return result
-    return wrapper
+def get_nested(data: dict, path: str, default: Any = None) -> Any:
+    """Access nested keys safely using dot notation."""
+    keys = path.split('.')
+    current = data
+    try:
+        for key in keys:
+            if isinstance(current, dict):
+                current = current.get(key)
+            else:
+                return default
+        return current if current is not None else default
+    except (AttributeError, KeyError):
+        return default
