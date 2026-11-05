@@ -1,35 +1,30 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional, Union
 
-def validate_schema(data: Any, schema: Dict[str, type]) -> bool:
-    """Verify that a dictionary matches expected types."""
-    if not isinstance(data, dict):
+def validate_email(email: str) -> bool:
+    """Validate format of provided email string."""
+    if not isinstance(email, str) or "@" not in email:
         return False
-    
-    for key, expected_type in schema.items():
-        if key not in data or not isinstance(data[key], expected_type):
-            return False
     return True
 
-def sanitize_list(items: List[Any], filter_none: bool = True) -> List[Any]:
-    """Clean list by removing null or invalid items."""
-    if filter_none:
-        return [i for i in items if i is not None]
-    return items
-
-def ensure_list(value: Any) -> List[Any]:
-    """Force data into a consistent list format."""
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return value
-    return [value]
-
-def dict_get_nested(data: Dict, keys: List[str], default: Any = None) -> Any:
-    """Retrieve nested dictionary values safely."""
-    current = data
+def ensure_int(value: Any, default: int = 0) -> int:
+    """Convert input to integer or return default."""
     try:
-        for key in keys:
-            current = current[key]
-        return current
-    except (KeyError, TypeError):
+        return int(value)
+    except (ValueError, TypeError):
         return default
+
+def validate_range(value: Union[int, float], min_val: float, max_val: float) -> bool:
+    """Check if number falls within inclusive bounds."""
+    return min_val <= value <= max_val
+
+def clean_string(value: Optional[str]) -> str:
+    """Strip whitespace and return empty string if None."""
+    if value is None:
+        return ""
+    return str(value).strip()
+
+def validate_non_empty(data: Any) -> bool:
+    """Verify data exists and is not empty container."""
+    if data is None:
+        return False
+    return bool(data)
