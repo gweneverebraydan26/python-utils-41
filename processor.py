@@ -1,48 +1,60 @@
-from typing import List, Dict, Any, Optional
+import time
+import random
+import logging
+from typing import Callable, Type, Tuple, Any
 
-class DataProcessor:
-    """Handles transformation of dictionary-based datasets."""
+logger = logging.getLogger(__name__)
 
-    def __init__(self, settings: Optional[Dict[str, Any]] = None) -> None:
-        self.settings: Dict[str, Any] = settings or {}
 
-    def filter_keys(self, data: List[Dict[str, Any]], allowed: List[str]) -> List[Dict[str, Any]]:
-        """
-        Filters dictionaries to retain only specified keys.
+def retry_network_op(
+    retries: int = 3,
+    backoff_factor: float = 0.5,
+    exceptions: Tuple[Type[Exception], ...] = (Exception,),
+    jitter: bool = True
+) -> Callable:
+    """
+    Decorator that retries a function upon specified exceptions with exponential backoff.
+    """
+    def decorator(func: Callable) -> Callable:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            attempt = 0
+            while attempt < retries:
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as err:
+                    attempt += 1
+                    if attempt >= retries:
+                        logger.error(
+                            f"Operation '{func.__name__}' failed after {retries} attempts: {err}"
+                        )
+                        raise
+                    
+                    delay = backoff_factor * (2 ** (attempt - 1))
+                    if jitter:
+                        delay += random.uniform(0, 0.1 * delay)
+                    
+                    logger.warning(
+                        f"Attempt {attempt}/{retries} for '{func.__name__}' failed: {err}. Retrying in {delay:.2f}s..."
+                    )
+                    time.sleep(delay)
+        return wrapper
+    return decorator
 
-        Args:
-            data: List of dictionaries to process.
-            allowed: List of keys to preserve.
 
-        Returns:
-            A filtered list of dictionaries.
-        """
-        return [{k: v for k, v in item.items() if k in allowed} for item in data]
-
-    def flatten_values(self, data: List[Dict[str, Any]]) -> List[Any]:
-        """
-        Extracts all values from a list of dictionaries into a flat list.
-
-        Args:
-            data: List of dictionaries to flatten.
-
-        Returns:
-            A single list containing all values.
-        """
-        results: List[Any] = []
-        for item in data:
-            results.extend(item.values())
-        return results
-
-    def process_batch(self, data: List[Dict[str, Any]], key: str) -> List[Any]:
-        """
-        Extracts values for a specific key across the batch.
-
-        Args:
-            data: Input data list.
-            key: Key to extract.
-
-        Returns:
-            List of values found for the given key.
-        """
-        return [item[key] for item in data if key in item]
+def execute_with_retry(
+    func: Callable,
+    *args: Any,
+    retries: int = 3,
+    backoff_factor: float = 0.5,
+    exceptions: Tuple[Type[Exception], ...] = (Exception,),
+    **kwargs: Any
+) -> Any:
+    """
+    Executes a callable with configurable retry logic and backoff delay.
+    """
+    retry_decorator = retry_network_op(
+        retries=retries,
+        backoff_factor=backoff_factor,
+        exceptions=exceptions
+    )
+    return retry_decorator(func)(*args, **kwargs)
