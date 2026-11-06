@@ -1,35 +1,31 @@
+import json
 import os
-import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-logger = logging.getLogger(__name__)
+class ConfigLoader:
+    """Handles configuration loading from JSON files with fallback defaults."""
 
-def load_config_value(key: str, default: Optional[Any] = None) -> Any:
-    """Retrieves environment configuration with type safety."""
-    try:
-        value = os.getenv(key)
-        if value is None:
-            if default is None:
-                raise KeyError(f"Missing required configuration: {key}")
-            return default
-        return value
-    except Exception as e:
-        logger.error(f"Unexpected error loading config {key}: {str(e)}")
-        return default
+    def __init__(self, default_config: Dict[str, Any] = None):
+        self.defaults = default_config or {}
 
-def parse_int_config(key: str, default: int) -> int:
-    """Safely parses an integer configuration value."""
-    val = load_config_value(key, str(default))
-    try:
-        return int(val)
-    except (ValueError, TypeError):
-        logger.warning(f"Invalid integer for {key}: {val}. Using default: {default}")
-        return default
+    def load(self, filepath: str) -> Dict[str, Any]:
+        """Loads configuration from a JSON file, merging with defaults."""
+        config = self.defaults.copy()
 
-def get_app_settings() -> Dict[str, Any]:
-    """Assembles application settings with validation."""
-    return {
-        "port": parse_int_config("APP_PORT", 8080),
-        "timeout": parse_int_config("APP_TIMEOUT", 30),
-        "debug": load_config_value("DEBUG", "false").lower() == "true"
-    }
+        if not os.path.exists(filepath):
+            return config
+
+        try:
+            with open(filepath, 'r') as f:
+                file_data = json.load(f)
+                if isinstance(file_data, dict):
+                    config.update(file_data)
+        except (json.JSONDecodeError, IOError):
+            pass
+
+        return config
+
+def get_app_config(filepath: str, defaults: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Utility function for quick configuration initialization."""
+    loader = ConfigLoader(defaults)
+    return loader.load(filepath)
