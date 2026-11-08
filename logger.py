@@ -2,28 +2,29 @@ import logging
 import sys
 from typing import Optional
 
-class AppLogger:
-    """Standardized logger configuration for python-utils-41."""
+def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
+    """Configures a standard logger with a stream handler."""
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
     
-    def __init__(self, name: str, level: int = logging.INFO):
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(level)
-        self._setup_handler()
+    # Prevent duplicate handlers if re-initialized
+    if not logger.handlers:
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+        
+    return logger
 
-    def _setup_handler(self) -> None:
-        """Configure stdout handler with a consistent format."""
-        if not self.logger.handlers:
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            handler = logging.StreamHandler(sys.stdout)
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
+class LoggerMixin:
+    """Mixin class to provide logging capabilities to classes."""
+    @property
+    def logger(self) -> logging.Logger:
+        return logging.getLogger(self.__class__.__name__)
 
-    def get_logger(self) -> logging.Logger:
-        """Return the underlying configured logger instance."""
-        return self.logger
-
-def get_module_logger(name: str) -> logging.Logger:
-    """Factory function for consistent module-level logging."""
-    return AppLogger(name).get_logger()
+def get_default_logger() -> logging.Logger:
+    """Helper for quick module-level access to logger."""
+    return setup_logger("python-utils-41")
