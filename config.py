@@ -1,60 +1,77 @@
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
+DEFAULT_CONFIG: Dict[str, Any] = {
+    "app_name": "python-utils",
+    "version": "1.0.0",
+    "debug": False,
+    "port": 8080,
+    "log_level": "INFO",
+    "max_retries": 3,
+}
+
 
 class ConfigLoader:
-    """Manages application configuration with default values and JSON file overrides."""
+    """Utility class to load and merge configuration settings with defaults."""
 
-    def __init__(self, defaults: Optional[Dict[str, Any]] = None):
-        self._defaults = defaults or {}
-        self._config = self._deep_copy(self._defaults)
+    def __init__(self, default_config: Optional[Dict[str, Any]] = None):
+        self.defaults = (
+            default_config.copy()
+            if default_config is not None
+            else DEFAULT_CONFIG.copy()
+        )
 
-    def _deep_copy(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        return json.loads(json.dumps(data))
+    def load_from_json(self, file_path: Union[str, Path]) -> Dict[str, Any]:
+        """Load configuration from a JSON file, falling back to defaults."""
+        config = self.defaults.copy()
+        path = Path(file_path)
 
-    def _merge_dicts(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
-        """Recursively merge override dictionary into base dictionary."""
-        merged = self._deep_copy(base)
-        for key, value in override.items():
-            if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
-                merged[key] = self._merge_dicts(merged[key], value)
-            else:
-                merged[key] = value
-        return merged
-
-    def load_from_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Merge custom configuration dictionary over existing config."""
-        self._config = self._merge_dicts(self._config, data)
-        return self._config
-
-    def load_from_file(self, filepath: Union[str, Path]) -> Dict[str, Any]:
-        """Load configuration from a JSON file and merge with current values."""
-        path = Path(filepath)
         if not path.exists():
-            raise FileNotFoundError(f"Config file not found: {filepath}")
+            return config
 
-        with open(path, "r", encoding="utf-8") as f:
-            file_data = json.load(f)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    config.update(data)
+        except (json.JSONDecodeError, OSError):
+            pass
 
-        return self.load_from_dict(file_data)
+        return config
 
-    def get(self, key: str, default: Any = None) -> Any:
-        """Retrieve configuration value using dot notation for nested keys."""
-        parts = key.split(".")
-        current = self._config
-        for part in parts:
-            if isinstance(current, dict) and part in current:
-                current = current[part]
-            else:
-                return default
-        return current
+    def apply_env_overrides(
+        self, config: Dict[str, Any], prefix: str = "APP_"
+    ) -> Dict[str, Any]:
+        """Override configuration values using matching environment variables."""
+        result = config.copy()
+        for key, default_val in result.items():
+            env_key = f"{prefix}{key.upper()}"
+            if env_key in os.environ:
+                raw_val = os.environ[env_key]
+                if isinstance(default_val, bool):
+                    result[key] = raw_val.lower() in ("true", "1", "yes")
+                elif isinstance(default_val, int):
+                    try:
+                        result[key] = int(raw_val)
+                    except ValueError:
+                        pass
+                else:
+                    result[key] = raw_val
+        return result
 
-    def reset(self) -> None:
-        """Reset configuration back to default values."""
-        self._config = self._deep_copy(self._defaults)
 
-    @property
-    def data(self) -> Dict[str, Any]:
-        """Return full current configuration dictionary."""
-        return self._deep_copy(self._config)
+def load_config(
+    config_path: Optional[Union[str, Path]] = None,
+    env_prefix: str = "APP_",
+    defaults: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Load configuration from JSON file with env overrides and default values."""
+    loader = ConfigLoader(default_config=defaults)
+    if config_path:
+        cfg = loader.load_from_json(config_path)
+    else:
+        cfg = loader.defaults.copy()
+
+    return loader.apply_env_overrides(cfg, prefix=env_prefix)
