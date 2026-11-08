@@ -1,40 +1,35 @@
-import logging
-from typing import Any, Optional, Callable
+import functools
+import itertools
+from typing import Any, Callable, Dict, List, Iterable, Generator
 
-logger = logging.getLogger(__name__)
 
-def safe_execute(func: Callable, *args: Any, default: Any = None, **kwargs: Any) -> Any:
-    """Execute a callable with broad exception handling and logging."""
-    try:
-        return func(*args, **kwargs)
-    except (ValueError, TypeError, AttributeError) as e:
-        logger.error(f"Execution error in {func.__name__}: {str(e)}")
-        return default
-    except Exception as e:
-        logger.critical(f"Unexpected system failure: {str(e)}", exc_info=True)
-        raise
+class FastBatchProcessor:
+    """High-performance batch processing engine with memoization and stream lazy loading."""
 
-def validate_payload(data: Any, schema_keys: list) -> bool:
-    """Check dictionary keys against schema with graceful failure."""
-    if not isinstance(data, dict):
-        logger.warning("Invalid input type: expected dictionary")
-        return False
-    
-    try:
-        return all(key in data for key in schema_keys)
-    except TypeError:
-        return False
+    def __init__(self, batch_size: int = 100, max_cache_size: int = 1024):
+        self.batch_size = max(1, batch_size)
+        self.max_cache_size = max_cache_size
+        self._cache: Dict[Any, Any] = {}
 
-def get_nested(data: dict, path: str, default: Any = None) -> Any:
-    """Access nested keys safely using dot notation."""
-    keys = path.split('.')
-    current = data
-    try:
-        for key in keys:
-            if isinstance(current, dict):
-                current = current.get(key)
-            else:
-                return default
-        return current if current is not None else default
-    except (AttributeError, KeyError):
-        return default
+    def _chunk_stream(self, iterable: Iterable[Any]) -> Generator[List[Any], None, None]:
+        """Yield successive batches from an iterable without full memory load."""
+        iterator = iter(iterable)
+        while batch := list(itertools.islice(iterator, self.batch_size)):
+            yield batch
+
+    def process_stream(self, items: Iterable[Any], transform_fn: Callable[[Any], Any]) -> Generator[Any, None, None]:
+        """Process an incoming stream using chunking and cache lookups for speed."""
+        cache = self._cache
+        max_size = self.max_cache_size
+
+        for batch in self._chunk_stream(items):
+            for item in batch:
+                if item not in cache:
+                    if len(cache) >= max_size:
+                        cache.clear()  # Fast flush on cache boundary
+                    cache[item] = transform_fn(item)
+                yield cache[item]
+
+    def process_batch(self, items: List[Any], transform_fn: Callable[[Any], Any]) -> List[Any]:
+        """Eagerly transform list of items returning pre-allocated results."""
+        return list(self.process_stream(items, transform_fn))
