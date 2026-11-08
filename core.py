@@ -1,35 +1,34 @@
 import functools
-import itertools
-from typing import Any, Callable, Dict, List, Iterable, Generator
+import time
+from typing import Callable, Any, Dict
 
+# Cache for repetitive function results to improve performance
+_CACHE: Dict[tuple, Any] = {}
 
-class FastBatchProcessor:
-    """High-performance batch processing engine with memoization and stream lazy loading."""
+def memoize(func: Callable) -> Callable:
+    """Decorator for caching function return values."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs) -> Any:
+        key = (func.__name__, args, frozenset(kwargs.items()))
+        if key not in _CACHE:
+            _CACHE[key] = func(*args, **kwargs)
+        return _CACHE[key]
+    return wrapper
 
-    def __init__(self, batch_size: int = 100, max_cache_size: int = 1024):
-        self.batch_size = max(1, batch_size)
-        self.max_cache_size = max_cache_size
-        self._cache: Dict[Any, Any] = {}
+def batch_process(items: list, chunk_size: int = 100):
+    """Memory-efficient generator for large dataset handling."""
+    for i in range(0, len(items), chunk_size):
+        yield items[i : i + chunk_size]
 
-    def _chunk_stream(self, iterable: Iterable[Any]) -> Generator[List[Any], None, None]:
-        """Yield successive batches from an iterable without full memory load."""
-        iterator = iter(iterable)
-        while batch := list(itertools.islice(iterator, self.batch_size)):
-            yield batch
+class PerformanceTracker:
+    """Context manager for tracking code execution duration."""
+    def __init__(self, label: str):
+        self.label = label
 
-    def process_stream(self, items: Iterable[Any], transform_fn: Callable[[Any], Any]) -> Generator[Any, None, None]:
-        """Process an incoming stream using chunking and cache lookups for speed."""
-        cache = self._cache
-        max_size = self.max_cache_size
+    def __enter__(self):
+        self.start = time.perf_counter()
+        return self
 
-        for batch in self._chunk_stream(items):
-            for item in batch:
-                if item not in cache:
-                    if len(cache) >= max_size:
-                        cache.clear()  # Fast flush on cache boundary
-                    cache[item] = transform_fn(item)
-                yield cache[item]
-
-    def process_batch(self, items: List[Any], transform_fn: Callable[[Any], Any]) -> List[Any]:
-        """Eagerly transform list of items returning pre-allocated results."""
-        return list(self.process_stream(items, transform_fn))
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        duration = time.perf_counter() - self.start
+        print(f"[PERF] {self.label}: {duration:.4f}s")
