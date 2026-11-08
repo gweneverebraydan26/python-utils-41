@@ -1,45 +1,34 @@
-from typing import List, Any, Optional, Dict
-import datetime
+import time
+import functools
+import logging
+from typing import Callable, Any
 
-def format_data(items: List[Dict[str, Any]], key: str) -> List[Any]:
-    """Extract values from list of dicts based on key.
+logger = logging.getLogger(__name__)
 
-    Args:
-        items: List of dictionaries to parse.
-        key: The dictionary key to extract.
+def retry_network_operation(max_attempts: int = 3, delay: float = 1.0):
+    """Decorator for retrying functions on exception."""
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            last_exception = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    if attempt < max_attempts:
+                        logger.warning(f"Attempt {attempt} failed, retrying in {delay}s...")
+                        time.sleep(delay)
+            logger.error(f"Operation failed after {max_attempts} attempts")
+            raise last_exception
+        return wrapper
+    return decorator
 
-    Returns:
-        A list of values associated with the specified key.
-    """
-    return [item[key] for item in items if key in item]
-
-def generate_timestamp() -> str:
-    """Create a string representation of current UTC time.
-
-    Returns:
-        ISO format string of the current UTC timestamp.
-    """
-    return datetime.datetime.now(datetime.timezone.utc).isoformat()
-
-def filter_none(data: Dict[str, Optional[Any]]) -> Dict[str, Any]:
-    """Remove keys with None values from a dictionary.
-
-    Args:
-        data: Input dictionary to filter.
-
-    Returns:
-        A new dictionary excluding None values.
-    """
-    return {k: v for k, v in data.items() if v is not None}
-
-def chunk_list(items: List[Any], size: int) -> List[List[Any]]:
-    """Split a list into smaller sub-lists of a defined size.
-
-    Args:
-        items: The list to be divided.
-        size: The maximum size of each chunk.
-
-    Returns:
-        A list of list chunks.
-    """
-    return [items[i:i + size] for i in range(0, len(items), size)]
+@retry_network_operation(max_attempts=3, delay=2.0)
+def fetch_data(url: str):
+    """Example of network-dependent function."""
+    # Simulating request logic
+    import random
+    if random.random() < 0.7:
+        raise ConnectionError("Network request failed")
+    return {"status": "success"}
