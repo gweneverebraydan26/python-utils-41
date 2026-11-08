@@ -2,52 +2,54 @@
 
 # python-utils-41
 
-`python-utils-41` is a lightweight, zero-dependency Python library designed to streamline common data manipulation, file handling, and execution tasks. It provides clean, performant helper functions that eliminate repetitive boilerplate code across your backend services and automation scripts.
+`python-utils-41` is a lightweight, zero-dependency Python toolkit designed to streamline common data processing, file system tasks, and functional workflows. It eliminates repetitive boilerplate across your projects by providing battle-tested helpers for dictionary manipulation, text normalization, and execution control.
 
 ## Features
 
-- **Smart Dictionary Merging**: Deep-merge nested dictionaries with configurable strategies for list handling and key collisions.
-- **Atomic File Operations**: Thread-safe, atomic read/write functions to prevent file corruption during execution failures.
-- **Exponential Retry Decorator**: Configurable function retry logic with customizable backoff timers for unstable network calls.
-- **String Normalization**: Fast unicode sanitization and slug generator optimized for data pipelines and web routes.
+- **Performance & Control Decorators:** Built-in timers, memoization helpers, and automatic retries with exponential backoff for flaky operations.
+- **Deep Dictionary Operations:** Utilities for recursive dictionary merging, key flattening, and safe dot-notation paths for nested structures.
+- **Text & Slug Processing:** High-performance text normalization, advanced slugification, and seamless case conversion (camelCase, snake_case, kebab-case).
+- **Atomic File Handling:** Safe file writing wrappers, directory tree management, and fast JSON/YAML file operations.
 
 ## Installation
 
-Install the package via `pip`:
+Install the package directly via `pip`:
 
 ```bash
 pip install python-utils-41
 ```
 
-For development installations from source:
+Or build from source:
 
 ```bash
 git clone https://github.com/Developer/python-utils-41.git
 cd python-utils-41
-pip install -e .
+pip install .
 ```
 
-## Basic Usage
+## Quick Start
 
 ```python
-from python_utils_41 import deep_merge, safe_write_json, retry
+from python_utils_41.decorators import retry
+from python_utils_41.dicts import deep_merge
+from python_utils_41.strings import slugify
 
-# Safely merge nested configuration objects
-default_config = {"database": {"host": "localhost", "port": 5432}, "retries": 3}
-user_config = {"database": {"port": 5433}}
+# Retry an operation up to 3 times with exponential backoff
+@retry(max_attempts=3, delay=1.0, backoff_factor=2.0)
+def connect_to_service():
+    # Simulation of a network call
+    return {"status": "connected"}
 
-final_config = deep_merge(default_config, user_config)
+# Merge nested configurations safely
+base_config = {"database": {"host": "localhost", "port": 5432}}
+override_config = {"database": {"port": 5433, "user": "admin"}}
+final_config = deep_merge(base_config, override_config)
 
-# Atomic JSON export
-safe_write_json("config.json", final_config)
-
-# Decorate unreliable network calls with auto-retry logic
-@retry(max_attempts=3, delay=1.5, backoff=2.0)
-def fetch_api_data():
-    # Your API request logic here
-    pass
+# Generate URL-friendly slugs
+clean_url = slugify("Release v1.0: New Features & Bug Fixes!")
+print(clean_url)  # Output: release-v10-new-features-and-bug-fixes
 ```
 
 ## License
 
-Distributed under the MIT License. Created by Developer.
+Distributed under the MIT License. See `LICENSE` for more information.
