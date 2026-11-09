@@ -1,28 +1,31 @@
-from typing import Any, Iterable, Optional, TypeVar
+import json
+import os
+from typing import Any, Dict
 
-T = TypeVar('T')
+def load_config(filepath: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Loads configuration from a JSON file, merging with provided defaults.
+    """
+    config = defaults.copy()
+    
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, 'r') as f:
+                file_data = json.load(f)
+                if isinstance(file_data, dict):
+                    config.update(file_data)
+        except (json.JSONDecodeError, IOError):
+            pass
+            
+    return config
 
-def flatten(items: Iterable[Any]) -> list[Any]:
-    """Flatten a nested list structure into a single list."""
-    result: list[Any] = []
-    for item in items:
-        if isinstance(item, (list, tuple)):
-            result.extend(flatten(item))
-        else:
-            result.append(item)
-    return result
-
-def get_first(items: Iterable[T], default: Optional[T] = None) -> Optional[T]:
-    """Retrieve the first element of an iterable or return a default."""
-    return next(iter(items), default)
-
-def chunker(data: list[T], size: int) -> Iterable[list[T]]:
-    """Split a list into smaller chunks of a specified size."""
-    if size <= 0:
-        raise ValueError("Chunk size must be a positive integer")
-    for i in range(0, len(data), size):
-        yield data[i:i + size]
-
-def dict_invert(data: dict[Any, T]) -> dict[T, Any]:
-    """Swap keys and values in a dictionary."""
-    return {v: k for k, v in data.items()}
+def save_config(filepath: str, config: Dict[str, Any]) -> bool:
+    """
+    Saves configuration dictionary to a JSON file.
+    """
+    try:
+        with open(filepath, 'w') as f:
+            json.dump(config, f, indent=4)
+        return True
+    except IOError:
+        return False
