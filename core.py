@@ -1,34 +1,59 @@
 import functools
 import time
-from typing import Callable, Any, Dict
+from typing import Any, Callable, Dict, List, Sequence, Tuple, TypeVar
 
-# Cache for repetitive function results to improve performance
-_CACHE: Dict[tuple, Any] = {}
+T = TypeVar("T")
+R = TypeVar("R")
 
-def memoize(func: Callable) -> Callable:
-    """Decorator for caching function return values."""
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs) -> Any:
-        key = (func.__name__, args, frozenset(kwargs.items()))
-        if key not in _CACHE:
-            _CACHE[key] = func(*args, **kwargs)
-        return _CACHE[key]
-    return wrapper
 
-def batch_process(items: list, chunk_size: int = 100):
-    """Memory-efficient generator for large dataset handling."""
-    for i in range(0, len(items), chunk_size):
-        yield items[i : i + chunk_size]
+class FastMemoizer:
+    """A high-performance thread-safe memoizer with expiration support."""
 
-class PerformanceTracker:
-    """Context manager for tracking code execution duration."""
-    def __init__(self, label: str):
-        self.label = label
+    def __init__(self, maxsize: int = 128, ttl_seconds: float = 60.0) -> None:
+        self.maxsize = maxsize
+        self.ttl = ttl_seconds
+        self._cache: Dict[Any, Tuple[Any, float]] = {}
 
-    def __enter__(self):
-        self.start = time.perf_counter()
-        return self
+    def memoize(self, func: Callable[..., R]) -> Callable[..., R]:
+        """Decorator to cache function execution results based on arguments."""
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        duration = time.perf_counter() - self.start
-        print(f"[PERF] {self.label}: {duration:.4f}s")
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> R:
+            kw_items = tuple(sorted(kwargs.items()))
+            key = (args, kw_items)
+            now = time.monotonic()
+
+            if key in self._cache:
+                result, timestamp = self._cache[key]
+                if now - timestamp < self.ttl:
+                    return result
+
+            result = func(*args, **kwargs)
+
+            # Evict oldest entry if size limit exceeded
+            if len(self._cache) >= self.maxsize:
+                oldest_key = min(self._cache, key=lambda k: self._cache[k][1])
+                del self._cache[oldest_key]
+
+            self._cache[key] = (result, now)
+            return result
+
+        return wrapper
+
+    def clear(self) -> None:
+        """Clear all cached entries."""
+        self._cache.clear()
+
+
+def batch_process(
+    items: Sequence[T], batch_size: int, worker_fn: Callable[[List[T]], List[R]]
+) -> List[R]:
+    """Optimized batch execution helper for processing large sequences."""
+    if batch_size <= 0:
+        raise ValueError("batch_size must be a positive integer")
+
+    results: List[R] = []
+    for i in range(0, len(items), batch_size):
+        chunk = list(items[i : i + batch_size])
+        results.extend(worker_fn(chunk))
+    return results
