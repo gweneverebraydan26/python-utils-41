@@ -1,34 +1,28 @@
-import typing
+import re
+from typing import Any, Optional
 
-def validate_numeric_input(value: typing.Any, min_val: float = 0, max_val: float = 100) -> float:
-    """Ensures input is a valid number within range."""
-    try:
-        num = float(value)
-    except (TypeError, ValueError) as e:
-        raise ValueError(f"Input {value} cannot be converted to float") from e
-    
-    if not (min_val <= num <= max_val):
-        raise ValueError(f"Value {num} outside bounds [{min_val}, {max_val}]")
-    
-    return num
+def is_email(value: str) -> bool:
+    """Validate RFC 5322 compliant email string."""
+    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(email_regex, value))
 
-def validate_dict_keys(data: typing.Dict, required_keys: typing.List[str]) -> bool:
-    """Checks for existence of keys in dictionary."""
-    if not isinstance(data, dict):
+def is_uuid(value: str) -> bool:
+    """Validate standard 8-4-4-4-12 UUID format."""
+    uuid_regex = r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+    return bool(re.match(uuid_regex, value))
+
+def is_not_empty(value: Any) -> bool:
+    """Verify object is not None or empty."""
+    if value is None:
         return False
-    
-    missing = [key for key in required_keys if key not in data]
-    if missing:
-        raise KeyError(f"Missing required keys: {', '.join(missing)}")
-    
+    if isinstance(value, (str, list, dict, set)):
+        return len(value) > 0
     return True
 
-def safe_list_access(items: typing.List, index: int, default: typing.Any = None) -> typing.Any:
-    """Safely retrieves items from lists with index checking."""
-    if not isinstance(items, list):
-        return default
-        
-    try:
-        return items[index]
-    except IndexError:
-        return default
+def validate_range(value: int, min_val: int, max_val: int) -> bool:
+    """Check if integer falls within inclusive range."""
+    return min_val <= value <= max_val
+
+def sanitize_string(value: str) -> str:
+    """Remove non-alphanumeric characters from input."""
+    return re.sub(r'[^a-zA-Z0-9]', '', value)
