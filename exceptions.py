@@ -1,32 +1,28 @@
-class UtilityError(Exception):
+class BaseUtilsError(Exception):
     """Base exception for python-utils-41 package."""
     pass
 
-class ConfigurationError(UtilityError):
-    """Raised when configuration values are missing or invalid."""
+class ConfigurationError(BaseUtilsError):
+    """Raised when configuration validation fails."""
     pass
 
-class ProcessingError(UtilityError):
-    """Raised when a data transformation fails."""
-    pass
+class ProcessingError(BaseUtilsError):
+    """Raised during data transformation failures."""
+    def __init__(self, message, original_exception=None):
+        super().__init__(message)
+        self.original_exception = original_exception
 
-def handle_exceptions(func):
-    """Decorator to wrap functions in standard error handling."""
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except (ValueError, TypeError, KeyError) as e:
-            raise ProcessingError(f"Processing failed: {str(e)}") from e
-        except Exception as e:
-            # Log unexpected errors before re-raising
-            print(f"Critical failure in {func.__name__}: {str(e)}")
-            raise
-    return wrapper
+class ValidationError(BaseUtilsError):
+    """Raised when inputs do not meet requirements."""
+    def __init__(self, field, reason):
+        self.field = field
+        self.reason = reason
+        super().__init__(f"Invalid field '{field}': {reason}")
 
-def validate_input(data):
-    """Checks if input data is non-empty before processing."""
-    if data is None:
-        raise ProcessingError("Input data cannot be None")
-    if not isinstance(data, (dict, list)):
-        raise ProcessingError("Invalid data format, expected dict or list")
-    return True
+def handle_exception(e):
+    """Centralized error reporting utility."""
+    if isinstance(e, BaseUtilsError):
+        print(f"[Utils Error] {e.__class__.__name__}: {e}")
+    else:
+        print(f"[Unexpected Error] {type(e).__name__}: {str(e)}")
+    raise e
