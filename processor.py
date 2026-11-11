@@ -1,60 +1,61 @@
-import time
-import random
 import logging
-from typing import Callable, Type, Tuple, Any
+from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
 
-def retry_network_op(
-    retries: int = 3,
-    backoff_factor: float = 0.5,
-    exceptions: Tuple[Type[Exception], ...] = (Exception,),
-    jitter: bool = True
-) -> Callable:
-    """
-    Decorator that retries a function upon specified exceptions with exponential backoff.
-    """
-    def decorator(func: Callable) -> Callable:
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            attempt = 0
-            while attempt < retries:
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as err:
-                    attempt += 1
-                    if attempt >= retries:
-                        logger.error(
-                            f"Operation '{func.__name__}' failed after {retries} attempts: {err}"
-                        )
-                        raise
-                    
-                    delay = backoff_factor * (2 ** (attempt - 1))
-                    if jitter:
-                        delay += random.uniform(0, 0.1 * delay)
-                    
-                    logger.warning(
-                        f"Attempt {attempt}/{retries} for '{func.__name__}' failed: {err}. Retrying in {delay:.2f}s..."
-                    )
-                    time.sleep(delay)
-        return wrapper
-    return decorator
+class DataProcessor:
+    """Processes incoming data items with strict schema validation."""
 
+    REQUIRED_KEYS = {"id", "action", "payload"}
+    VALID_ACTIONS = {"create", "update", "delete"}
 
-def execute_with_retry(
-    func: Callable,
-    *args: Any,
-    retries: int = 3,
-    backoff_factor: float = 0.5,
-    exceptions: Tuple[Type[Exception], ...] = (Exception,),
-    **kwargs: Any
-) -> Any:
-    """
-    Executes a callable with configurable retry logic and backoff delay.
-    """
-    retry_decorator = retry_network_op(
-        retries=retries,
-        backoff_factor=backoff_factor,
-        exceptions=exceptions
-    )
-    return retry_decorator(func)(*args, **kwargs)
+    def __init__(self, strict_mode: bool = False):
+        self.strict_mode = strict_mode
+
+    def validate_item(self, item: Any) -> Tuple[bool, str]:
+        """Validates a single input record for correct type and required fields."""
+        if not isinstance(item, dict):
+            return False, f"Expected dict, got {type(item).__name__}"
+
+        missing_keys = self.REQUIRED_KEYS - set(item.keys())
+        if missing_keys:
+            return False, f"Missing required keys: {', '.join(sorted(missing_keys))}"
+
+        if not isinstance(item["id"], (int, str)) or not str(item["id"]).strip():
+            return False, "Invalid 'id': must be non-empty string or integer"
+
+        if item["action"] not in self.VALID_ACTIONS:
+            return False, f"Invalid 'action': must be one of {sorted(self.VALID_ACTIONS)}"
+
+        if not isinstance(item["payload"], dict):
+            return False, "Invalid 'payload': must be a dictionary"
+
+        return True, ""
+
+    def process_batch(self, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Main processing loop with input validation for each entry."""
+        successful = []
+        failed = []
+
+        for index, item in enumerate(items):
+            is_valid, error_msg = self.validate_item(item)
+            if not is_valid:
+                logger.warning(f"Item at index {index} failed validation: {error_msg}")
+                failed.append({"index": index, "item": item, "reason": error_msg})
+                if self.strict_mode:
+                    raise ValueError(f"Validation failed at index {index}: {error_msg}")
+                continue
+
+            item_id = item["id"]
+            action = item["action"]
+            payload_size = len(item["payload"])
+            successful.append({"id": item_id, "action": action, "processed_fields": payload_size})
+
+        return {
+            "total": len(items),
+            "successful_count": len(successful),
+            "failed_count": len(failed),
+            "successful": successful,
+            "failed": failed,
+        }
