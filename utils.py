@@ -1,34 +1,37 @@
-import time
-import functools
-import logging
-from typing import Callable, Any
+import json
+from typing import Any, Dict, Optional
 
-logger = logging.getLogger(__name__)
+def deep_get(data: Dict[str, Any], path: str, default: Any = None) -> Any:
+    """
+    Retrieves a nested value from a dictionary using dot notation.
+    """
+    keys = path.split('.')
+    val = data
+    try:
+        for key in keys:
+            val = val[key]
+        return val
+    except (KeyError, TypeError, AttributeError):
+        return default
 
-def retry_network_operation(max_attempts: int = 3, delay: float = 1.0):
-    """Decorator for retrying functions on exception."""
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            last_exception = None
-            for attempt in range(1, max_attempts + 1):
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    last_exception = e
-                    if attempt < max_attempts:
-                        logger.warning(f"Attempt {attempt} failed, retrying in {delay}s...")
-                        time.sleep(delay)
-            logger.error(f"Operation failed after {max_attempts} attempts")
-            raise last_exception
-        return wrapper
-    return decorator
+def sanitize_payload(data: Any) -> Any:
+    """
+    Recursively cleans data to ensure JSON compatibility.
+    """
+    if isinstance(data, dict):
+        return {str(k): sanitize_payload(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [sanitize_payload(i) for i in data]
+    elif isinstance(data, (str, int, float, bool)) or data is None:
+        return data
+    return str(data)
 
-@retry_network_operation(max_attempts=3, delay=2.0)
-def fetch_data(url: str):
-    """Example of network-dependent function."""
-    # Simulating request logic
-    import random
-    if random.random() < 0.7:
-        raise ConnectionError("Network request failed")
-    return {"status": "success"}
+def load_json_file(filepath: str) -> Optional[Dict[str, Any]]:
+    """
+    Safe loading of configuration or data files.
+    """
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
