@@ -1,59 +1,28 @@
-import functools
-import time
-from typing import Any, Callable, Dict, List, Sequence, Tuple, TypeVar
+from typing import Any, Dict, List, Optional
 
-T = TypeVar("T")
-R = TypeVar("R")
+class DataProcessor:
+    """Handles transformation of dictionary data sets."""
 
+    def __init__(self, settings: Optional[Dict[str, Any]] = None) -> None:
+        self.settings: Dict[str, Any] = settings or {}
 
-class FastMemoizer:
-    """A high-performance thread-safe memoizer with expiration support."""
+    def sanitize_keys(self, data: Dict[str, Any]) -> Dict[str, str]:
+        """Converts all dictionary keys to lowercase strings."""
+        return {str(k).lower(): v for k, v in data.items()}
 
-    def __init__(self, maxsize: int = 128, ttl_seconds: float = 60.0) -> None:
-        self.maxsize = maxsize
-        self.ttl = ttl_seconds
-        self._cache: Dict[Any, Tuple[Any, float]] = {}
+    def filter_by_prefix(self, data: Dict[str, Any], prefix: str) -> Dict[str, Any]:
+        """Returns items where keys start with the provided prefix."""
+        return {k: v for k, v in data.items() if k.startswith(prefix)}
 
-    def memoize(self, func: Callable[..., R]) -> Callable[..., R]:
-        """Decorator to cache function execution results based on arguments."""
+    def batch_process(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Applies sanitization to a list of dictionaries."""
+        return [self.sanitize_keys(item) for item in items]
 
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> R:
-            kw_items = tuple(sorted(kwargs.items()))
-            key = (args, kw_items)
-            now = time.monotonic()
+def format_log_entry(message: str, level: str = "INFO") -> str:
+    """Standardized formatter for system log messages."""
+    return f"[{level.upper()}] {message.strip()}"
 
-            if key in self._cache:
-                result, timestamp = self._cache[key]
-                if now - timestamp < self.ttl:
-                    return result
-
-            result = func(*args, **kwargs)
-
-            # Evict oldest entry if size limit exceeded
-            if len(self._cache) >= self.maxsize:
-                oldest_key = min(self._cache, key=lambda k: self._cache[k][1])
-                del self._cache[oldest_key]
-
-            self._cache[key] = (result, now)
-            return result
-
-        return wrapper
-
-    def clear(self) -> None:
-        """Clear all cached entries."""
-        self._cache.clear()
-
-
-def batch_process(
-    items: Sequence[T], batch_size: int, worker_fn: Callable[[List[T]], List[R]]
-) -> List[R]:
-    """Optimized batch execution helper for processing large sequences."""
-    if batch_size <= 0:
-        raise ValueError("batch_size must be a positive integer")
-
-    results: List[R] = []
-    for i in range(0, len(items), batch_size):
-        chunk = list(items[i : i + batch_size])
-        results.extend(worker_fn(chunk))
-    return results
+if __name__ == "__main__":
+    processor = DataProcessor()
+    sample = {"Name": "Test", "ID": 123}
+    print(processor.sanitize_keys(sample))
