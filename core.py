@@ -1,28 +1,43 @@
-from typing import Any, Dict, List, Optional
+"""Core execution engine with performance optimizations for data processing."""
 
-class DataProcessor:
-    """Handles transformation of dictionary data sets."""
+import itertools
+from functools import lru_cache
+from typing import Any, Callable, Generator, Iterable, Sequence
 
-    def __init__(self, settings: Optional[Dict[str, Any]] = None) -> None:
-        self.settings: Dict[str, Any] = settings or {}
 
-    def sanitize_keys(self, data: Dict[str, Any]) -> Dict[str, str]:
-        """Converts all dictionary keys to lowercase strings."""
-        return {str(k).lower(): v for k, v in data.items()}
+class FastTaskRunner:
+    """Optimized task wrapper utilizing slots and caching for fast computation."""
 
-    def filter_by_prefix(self, data: Dict[str, Any], prefix: str) -> Dict[str, Any]:
-        """Returns items where keys start with the provided prefix."""
-        return {k: v for k, v in data.items() if k.startswith(prefix)}
+    __slots__ = ("_func", "_cache_size")
 
-    def batch_process(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Applies sanitization to a list of dictionaries."""
-        return [self.sanitize_keys(item) for item in items]
+    def __init__(self, func: Callable[..., Any], cache_size: int = 256) -> None:
+        self._func = lru_cache(maxsize=cache_size)(func)
+        self._cache_size = cache_size
 
-def format_log_entry(message: str, level: str = "INFO") -> str:
-    """Standardized formatter for system log messages."""
-    return f"[{level.upper()}] {message.strip()}"
+    def run(self, *args: Any) -> Any:
+        """Execute underlying function with argument caching."""
+        return self._func(*args)
 
-if __name__ == "__main__":
-    processor = DataProcessor()
-    sample = {"Name": "Test", "ID": 123}
-    print(processor.sanitize_keys(sample))
+    def clear_cache(self) -> None:
+        """Clear memoized return values."""
+        self._func.cache_clear()
+
+
+def batch_iterable(
+    iterable: Iterable[Any], chunk_size: int = 100
+) -> Generator[list[Any], None, None]:
+    """Yield items in chunks using memory-efficient iterator slicing."""
+    if chunk_size < 1:
+        raise ValueError("chunk_size must be at least 1")
+
+    iterator = iter(iterable)
+    while True:
+        chunk = list(itertools.islice(iterator, chunk_size))
+        if not chunk:
+            break
+        yield chunk
+
+
+def fast_unique(items: Sequence[Any]) -> list[Any]:
+    """Preserve element order while deduplicating in linear time."""
+    return list(dict.fromkeys(items))
