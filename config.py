@@ -2,35 +2,34 @@ import json
 import os
 from typing import Any, Dict
 
-def load_config(path: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Loads configuration from a JSON file with specified defaults.
-    Returns the merged configuration dictionary.
-    """
-    config = defaults.copy()
+class ConfigLoader:
+    """Utility for loading JSON configurations with defaults."""
 
-    if not os.path.exists(path):
-        return config
+    def __init__(self, default_config: Dict[str, Any]):
+        self.config = default_config
 
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            if isinstance(data, dict):
-                config.update(data)
-    except (json.JSONDecodeError, IOError):
-        pass
+    def load_from_file(self, filepath: str) -> None:
+        """Overwrites default config with values from JSON file."""
+        if not os.path.exists(filepath):
+            return
 
-    return config
+        with open(filepath, 'r') as f:
+            try:
+                user_config = json.load(f)
+                self.config.update(user_config)
+            except json.JSONDecodeError:
+                pass
 
-def save_config(path: str, config: Dict[str, Any]) -> None:
-    """
-    Persists the current configuration dictionary to a JSON file.
-    """
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(config, f, indent=4)
+    def get(self, key: str, default: Any = None) -> Any:
+        """Retrieves value by key with optional fallback."""
+        return self.config.get(key, default)
 
+    def __getitem__(self, key: str) -> Any:
+        return self.config[key]
+
+# Example usage for python-utils-41
 if __name__ == '__main__':
-    # Example usage for python-utils-41
-    defaults = {'debug': False, 'port': 8080, 'host': 'localhost'}
-    loaded = load_config('settings.json', defaults)
-    print(f'Loaded config: {loaded}')
+    defaults = {'host': 'localhost', 'port': 8080}
+    loader = ConfigLoader(defaults)
+    loader.load_from_file('settings.json')
+    print(f"Active configuration: {loader.config}")
