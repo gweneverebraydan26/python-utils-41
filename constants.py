@@ -1,55 +1,33 @@
-"""Module defining global application constants, defaults, and formats."""
-
-from enum import Enum, unique
+import enum
 from typing import Final, Dict, Any
 
-# General Application Metadata
-APP_NAME: Final[str] = "python-utils-41"
+# general constants for data handling operations
 DEFAULT_ENCODING: Final[str] = "utf-8"
-BUFFER_SIZE: Final[int] = 8192
-
-# Timeouts and Limits (in seconds/units)
-DEFAULT_TIMEOUT: Final[float] = 30.0
+CHUNK_SIZE: Final[int] = 4096
 MAX_RETRIES: Final[int] = 3
-BACKOFF_FACTOR: Final[float] = 1.5
 
-# Standard Date & Time Formats
-ISO_DATETIME_FORMAT: Final[str] = "%Y-%m-%dT%H:%M:%SZ"
-LOG_DATETIME_FORMAT: Final[str] = "%Y-%m-%d %H:%M:%S"
-SIMPLE_DATE_FORMAT: Final[str] = "%Y-%m-%d"
+class DataStatus(enum.Enum):
+    SUCCESS = "success"
+    FAILURE = "failure"
+    PENDING = "pending"
 
-# File Processing Extensions
-SUPPORTED_TEXT_EXTENSIONS: Final[tuple] = (".txt", ".md", ".json", ".csv", ".yaml", ".yml")
-SUPPORTED_IMAGE_EXTENSIONS: Final[tuple] = (".png", ".jpg", ".jpeg", ".webp", ".gif")
-
-
-@unique
-class Environment(str, Enum):
-    """Supported execution environments."""
-
-    DEVELOPMENT = "development"
-    STAGING = "staging"
-    PRODUCTION = "production"
-    TESTING = "testing"
-
-
-@unique
-class LogLevel(str, Enum):
-    """Standard logging level strings."""
-
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
-
-
-# Default System Configuration Values
-DEFAULT_CONFIG: Final[Dict[str, Any]] = {
-    "env": Environment.DEVELOPMENT.value,
-    "debug": False,
-    "log_level": LogLevel.INFO.value,
-    "timeout": DEFAULT_TIMEOUT,
-    "max_retries": MAX_RETRIES,
-    "encoding": DEFAULT_ENCODING,
+# mapping of common content types
+CONTENT_TYPES: Final[Dict[str, str]] = {
+    "json": "application/json",
+    "csv": "text/csv",
+    "txt": "text/plain",
+    "yaml": "application/x-yaml"
 }
+
+def get_timeout_settings(mode: str = "standard") -> int:
+    """returns integer timeout duration based on mode."""
+    settings = {
+        "fast": 5,
+        "standard": 30,
+        "slow": 120
+    }
+    return settings.get(mode, 30)
+
+# validation constraints
+MIN_PASSWORD_LENGTH: Final[int] = 12
+ALLOWED_EXTENSIONS: Final[set] = {"json", "csv", "txt"}
