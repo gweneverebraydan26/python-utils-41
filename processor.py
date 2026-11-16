@@ -1,67 +1,60 @@
-"""Safe data processing utilities with robust error handling for edge cases."""
-
 import math
-from typing import Any, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 
-def safe_cast(
-    val: Any, target_type: type, default: Optional[Any] = None
-) -> Any:
-    """Safely cast value to target_type, returning default on edge case failures."""
-    if val is None:
+class ProcessingError(Exception):
+    """Custom exception for unrecoverable processing failures."""
+    pass
+
+
+def safe_numeric_cast(value: Any, default: Optional[float] = None) -> Optional[float]:
+    """Safely convert input to float, handling NaN, infinity, and type errors."""
+    if value is None:
         return default
     try:
-        if target_type in (int, float) and isinstance(val, (int, float, str)):
-            parsed = float(val)
-            if math.isnan(parsed) or math.isinf(parsed):
-                return default
-        return target_type(val)
-    except (ValueError, TypeError, OverflowError):
-        return default
-
-
-def safe_divide(
-    numerator: Union[int, float],
-    denominator: Union[int, float],
-    default: Union[int, float] = 0.0,
-) -> Union[int, float]:
-    """Safely divide numbers, handling division by zero, NaN, and inf values."""
-    try:
-        num = float(numerator)
-        den = float(denominator)
-        if den == 0.0 or math.isnan(num) or math.isnan(den) or math.isinf(num) or math.isinf(den):
+        val = float(value)
+        if math.isnan(val) or math.isinf(val):
             return default
-        return num / den
-    except (ValueError, TypeError, OverflowError):
+        return val
+    except (ValueError, TypeError):
         return default
 
 
-def deep_get(
-    data: Any, path: str, default: Optional[Any] = None, delimiter: str = "."
-) -> Any:
-    """Safely retrieve nested dict/list attributes handling invalid path/index edge cases."""
-    if not path or not isinstance(path, str):
-        return default
+def process_batch(items: List[Any], key: Optional[str] = None) -> Dict[str, Union[int, float, List[Any]]]:
+    """Process a list of items or dicts, handling invalid entries and edge cases cleanly."""
+    if not isinstance(items, list):
+        raise ProcessingError(f"Expected list for items, got {type(items).__name__}")
 
-    keys = path.split(delimiter)
-    current = data
+    sanitized = []
+    numeric_vals = []
+    skipped = 0
 
-    for key in keys:
-        if isinstance(current, dict):
-            current = current.get(key, default)
-        elif isinstance(current, (list, tuple)):
-            try:
-                idx = int(key)
-                if 0 <= idx < len(current):
-                    current = current[idx]
-                else:
-                    return default
-            except (ValueError, TypeError):
-                return default
+    for item in items:
+        if item is None:
+            skipped += 1
+            continue
+
+        target_val = item
+        if key is not None:
+            if not isinstance(item, dict) or key not in item:
+                skipped += 1
+                continue
+            target_val = item[key]
+
+        cast_val = safe_numeric_cast(target_val)
+        if cast_val is not None:
+            numeric_vals.append(cast_val)
+            sanitized.append(item)
         else:
-            return default
+            skipped += 1
 
-        if current is default:
-            break
+    total_valid = len(sanitized)
+    avg_val = sum(numeric_vals) / total_valid if total_valid > 0 else 0.0
 
-    return current
+    return {
+        "total_processed": len(items),
+        "valid_count": total_valid,
+        "skipped_count": skipped,
+        "average": round(avg_val, 4),
+        "sanitized_data": sanitized,
+    }
