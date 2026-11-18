@@ -1,43 +1,40 @@
-"""Core execution engine with performance optimizations for data processing."""
+import functools
+import time
+from typing import Callable, Any, Dict
 
-import itertools
-from functools import lru_cache
-from typing import Any, Callable, Generator, Iterable, Sequence
+# Cache for compute-intensive function results to improve throughput
+_LRU_CACHE_SIZE = 128
 
+class PerformanceOptimizer:
+    """Utility class providing decorators for performance enhancements."""
 
-class FastTaskRunner:
-    """Optimized task wrapper utilizing slots and caching for fast computation."""
+    @staticmethod
+    def memoize(func: Callable) -> Callable:
+        """Wraps a function with an LRU cache for result reuse."""
+        return functools.lru_cache(maxsize=_LRU_CACHE_SIZE)(func)
 
-    __slots__ = ("_func", "_cache_size")
+    @staticmethod
+    def timer(func: Callable) -> Callable:
+        """Execution time tracking for bottleneck identification."""
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            start = time.perf_counter()
+            result = func(*args, **kwargs)
+            duration = time.perf_counter() - start
+            # Log duration to standard output for telemetry
+            print(f"DEBUG: {func.__name__} executed in {duration:.4f}s")
+            return result
+        return wrapper
 
-    def __init__(self, func: Callable[..., Any], cache_size: int = 256) -> None:
-        self._func = lru_cache(maxsize=cache_size)(func)
-        self._cache_size = cache_size
+# Optimized core processing logic
+@PerformanceOptimizer.memoize
+def heavy_computation(n: int) -> int:
+    """Example of an expensive operation optimized via caching."""
+    total = 0
+    for i in range(n):
+        total += i * i
+    return total
 
-    def run(self, *args: Any) -> Any:
-        """Execute underlying function with argument caching."""
-        return self._func(*args)
-
-    def clear_cache(self) -> None:
-        """Clear memoized return values."""
-        self._func.cache_clear()
-
-
-def batch_iterable(
-    iterable: Iterable[Any], chunk_size: int = 100
-) -> Generator[list[Any], None, None]:
-    """Yield items in chunks using memory-efficient iterator slicing."""
-    if chunk_size < 1:
-        raise ValueError("chunk_size must be at least 1")
-
-    iterator = iter(iterable)
-    while True:
-        chunk = list(itertools.islice(iterator, chunk_size))
-        if not chunk:
-            break
-        yield chunk
-
-
-def fast_unique(items: Sequence[Any]) -> list[Any]:
-    """Preserve element order while deduplicating in linear time."""
-    return list(dict.fromkeys(items))
+def batch_process(data: list) -> list:
+    """Efficient list comprehension for bulk data transformation."""
+    return [heavy_computation(x) for x in data]
