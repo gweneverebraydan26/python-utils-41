@@ -1,35 +1,32 @@
 import logging
+from logging.handlers import RotatingFileHandler
 import sys
-from typing import Optional
 
-class DataLogger:
-    """Utility for standardized application logging."""
-    def __init__(self, name: str, level: int = logging.INFO):
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(level)
-        
-        # Standard console handler
-        handler = logging.StreamHandler(sys.stdout)
+def setup_logger(name='app_logger', log_file='app.log', level=logging.INFO):
+    """
+    Configures a logger with rotation to prevent disk space issues.
+    Logs to both the console and a rotating file.
+    """
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+
+    # Prevent duplicate handlers if function is called multiple times
+    if not logger.handlers:
         formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
 
-    def log_data(self, label: str, data: any) -> None:
-        """Logs arbitrary data structures with a label."""
-        try:
-            self.logger.info(f"[{label}]: {repr(data)}")
-        except Exception as e:
-            self.logger.error(f"Logging failure for {label}: {e}")
+        # File handler with 5MB rotation limit and 3 backups
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=5*1024*1024, backupCount=3
+        )
+        file_handler.setFormatter(formatter)
 
-    def capture_error(self, message: str, exc: Optional[Exception] = None) -> None:
-        """Logs error context with optional exception details."""
-        if exc:
-            self.logger.error(f"{message}: {str(exc)}", exc_info=True)
-        else:
-            self.logger.error(message)
+        # Console handler
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
 
-def get_logger(name: str = "python-utils-41") -> DataLogger:
-    """Factory function for DataLogger instances."""
-    return DataLogger(name)
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+
+    return logger
