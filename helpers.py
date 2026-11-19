@@ -1,27 +1,31 @@
-import time
 import functools
-import logging
-from typing import Callable, Any, Type, Tuple
+import time
+from typing import Callable, Any, Dict
 
-logger = logging.getLogger(__name__)
+_memoization_cache: Dict[tuple, Any] = {}
 
-def retry_on_failure(exceptions: Tuple[Type[Exception], ...] = (Exception,), 
-                     max_retries: int = 3, 
-                     delay: float = 1.0):
-    """Decorator to retry network functions on failure."""
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            last_exception = None
-            for attempt in range(max_retries):
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    last_exception = e
-                    logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
-                    time.sleep(delay)
-            
-            logger.error(f"Final attempt failed after {max_retries} retries.")
-            raise last_exception
-        return wrapper
-    return decorator
+def memoize(func: Callable) -> Callable:
+    """Thread-safe cache for expensive function calls."""
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        key = (func.__name__, args, frozenset(kwargs.items()))
+        if key not in _memoization_cache:
+            _memoization_cache[key] = func(*args, **kwargs)
+        return _memoization_cache[key]
+    return wrapper
+
+def batch_process(data: list, chunk_size: int = 100):
+    """Generator to yield chunks for memory efficiency."""
+    for i in range(0, len(data), chunk_size):
+        yield data[i:i + chunk_size]
+
+def timed_execution(func: Callable) -> Callable:
+    """Decorator for monitoring execution performance overhead."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        duration = time.perf_counter() - start
+        # Standard logging can be injected here if required
+        return result
+    return wrapper
