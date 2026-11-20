@@ -1,32 +1,55 @@
 import logging
+import os
 from logging.handlers import RotatingFileHandler
-import sys
+from typing import Optional
 
-def setup_logger(name='app_logger', log_file='app.log', level=logging.INFO):
-    """
-    Configures a logger with rotation to prevent disk space issues.
-    Logs to both the console and a rotating file.
-    """
+
+def setup_logger(
+    name: str = "app",
+    log_file: Optional[str] = "app.log",
+    max_bytes: int = 5 * 1024 * 1024,
+    backup_count: int = 3,
+    level: int = logging.INFO,
+    console: bool = True,
+) -> logging.Logger:
+    """Configures and returns a Logger instance with rotating file and console handlers."""
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    # Prevent duplicate handlers if function is called multiple times
-    if not logger.handlers:
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+    # Clear existing handlers to prevent duplicate logging
+    if logger.handlers:
+        logger.handlers.clear()
 
-        # File handler with 5MB rotation limit and 3 backups
-        file_handler = RotatingFileHandler(
-            log_file, maxBytes=5*1024*1024, backupCount=3
-        )
-        file_handler.setFormatter(formatter)
+    log_format = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
-        # Console handler
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setFormatter(formatter)
-
-        logger.addHandler(file_handler)
+    if console:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(log_format)
         logger.addHandler(console_handler)
 
+    if log_file:
+        log_dir = os.path.dirname(log_file)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
+
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=max_bytes,
+            backupCount=backup_count,
+            encoding="utf-8",
+        )
+        file_handler.setFormatter(log_format)
+        logger.addHandler(file_handler)
+
+    return logger
+
+
+def get_logger(name: str = "app") -> logging.Logger:
+    """Retrieves an existing logger or initializes a default setup if unconfigured."""
+    logger = logging.getLogger(name)
+    if not logger.handlers:
+        return setup_logger(name)
     return logger
