@@ -1,31 +1,39 @@
-import functools
-import time
-from typing import Callable, Any, Dict
+from typing import Any, Dict, List, Optional
 
-_memoization_cache: Dict[tuple, Any] = {}
+def flatten_dict(data: Dict[str, Any], parent_key: str = '', sep: str = '_') -> Dict[str, Any]:
+    """
+    Flattens a nested dictionary structure into a single level.
 
-def memoize(func: Callable) -> Callable:
-    """Thread-safe cache for expensive function calls."""
-    @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        key = (func.__name__, args, frozenset(kwargs.items()))
-        if key not in _memoization_cache:
-            _memoization_cache[key] = func(*args, **kwargs)
-        return _memoization_cache[key]
-    return wrapper
+    Args:
+        data: The dictionary to flatten.
+        parent_key: The string to prefix keys with.
+        sep: The separator used for nested keys.
 
-def batch_process(data: list, chunk_size: int = 100):
-    """Generator to yield chunks for memory efficiency."""
-    for i in range(0, len(data), chunk_size):
-        yield data[i:i + chunk_size]
+    Returns:
+        A flattened dictionary with joined keys.
+    """
+    items: List[tuple] = []
+    for k, v in data.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
 
-def timed_execution(func: Callable) -> Callable:
-    """Decorator for monitoring execution performance overhead."""
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        start = time.perf_counter()
-        result = func(*args, **kwargs)
-        duration = time.perf_counter() - start
-        # Standard logging can be injected here if required
-        return result
-    return wrapper
+def format_byte_size(size: int, suffix: str = 'B') -> str:
+    """
+    Converts an integer byte size into a human-readable string.
+
+    Args:
+        size: The size in bytes.
+        suffix: The unit suffix to append.
+
+    Returns:
+        A formatted string representation of the size.
+    """
+    for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
+        if abs(size) < 1024.0:
+            return f"{size:3.1f}{unit}{suffix}"
+        size /= 1024.0
+    return f"{size:.1f}Yi{suffix}"
