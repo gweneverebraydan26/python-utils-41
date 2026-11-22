@@ -1,28 +1,80 @@
-class ValidationError(Exception):
-    """Base class for validation errors in processing."""
-    pass
+"""General data validation utilities for Python applications."""
 
-def validate_input_data(data: dict) -> None:
-    """Ensures incoming data dictionary contains required keys."""
-    required_keys = {'id', 'payload', 'timestamp'}
-    
+import re
+from typing import Any, Dict, List, Optional, Union
+
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+URL_REGEX = re.compile(
+    r"^(?:http|ftp)s?://"  # http:// or https://
+    r"(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|"
+    r"localhost|"
+    r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"
+    r"(?::\d+)?"
+    r"(?:/?|[/?]\S+)$",
+    re.IGNORECASE,
+)
+
+
+def is_valid_email(email: str) -> bool:
+    """Validate if the given string is a properly formatted email address.
+
+    Args:
+        email: String representation of the email to check.
+
+    Returns:
+        True if valid email format, False otherwise.
+    """
+    if not isinstance(email, str):
+        return False
+    return bool(EMAIL_REGEX.match(email.strip()))
+
+
+def is_valid_url(url: str) -> bool:
+    """Check whether a provided string matches standard HTTP/HTTPS/FTP URL structure.
+
+    Args:
+        url: The URL string to validate.
+
+    Returns:
+        True if the URL format is valid, False otherwise.
+    """
+    if not isinstance(url, str):
+        return False
+    return bool(URL_REGEX.match(url.strip()))
+
+
+def validate_range(
+    value: Union[int, float],
+    min_val: Optional[Union[int, float]] = None,
+    max_val: Optional[Union[int, float]] = None,
+) -> bool:
+    """Ensure a numerical value falls within an optional minimum and maximum range.
+
+    Args:
+        value: Number to check.
+        min_val: Minimum acceptable value inclusive.
+        max_val: Maximum acceptable value inclusive.
+
+    Returns:
+        True if value falls within specified range boundaries.
+    """
+    if min_val is not None and value < min_val:
+        return False
+    if max_val is not None and value > max_val:
+        return False
+    return True
+
+
+def has_required_keys(data: Dict[str, Any], keys: List[str]) -> bool:
+    """Verify that all specified keys exist in a dictionary.
+
+    Args:
+        data: The dictionary to check.
+        keys: List of key names that must be present.
+
+    Returns:
+        True if all required keys are present in dictionary, False otherwise.
+    """
     if not isinstance(data, dict):
-        raise ValidationError("Input must be a dictionary")
-    
-    missing = required_keys - data.keys()
-    if missing:
-        raise ValidationError(f"Missing required fields: {', '.join(missing)}")
-
-def run_processing_loop(items: list):
-    """Main processing loop with data validation."""
-    results = []
-    for item in items:
-        try:
-            validate_input_data(item)
-            # Mock business logic execution
-            results.append({"status": "processed", "id": item.get("id")})
-        except ValidationError as e:
-            # Log error and continue with next item
-            print(f"Validation failed for {item}: {e}")
-            continue
-    return results
+        return False
+    return all(k in data for k in keys)
