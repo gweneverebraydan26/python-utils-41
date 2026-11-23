@@ -1,55 +1,50 @@
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 # python-utils-41
 
-`python-utils-41` is a lightweight, zero-dependency Python toolkit designed to streamline common data processing, file system tasks, and functional workflows. It eliminates repetitive boilerplate across your projects by providing battle-tested helpers for dictionary manipulation, text normalization, and execution control.
+A collection of lightweight, high-performance Python utilities designed to streamline daily automation and data processing tasks. This library focuses on reducing boilerplate code for common file system operations, text manipulation, and execution timing.
 
 ## Features
 
-- **Performance & Control Decorators:** Built-in timers, memoization helpers, and automatic retries with exponential backoff for flaky operations.
-- **Deep Dictionary Operations:** Utilities for recursive dictionary merging, key flattening, and safe dot-notation paths for nested structures.
-- **Text & Slug Processing:** High-performance text normalization, advanced slugification, and seamless case conversion (camelCase, snake_case, kebab-case).
-- **Atomic File Handling:** Safe file writing wrappers, directory tree management, and fast JSON/YAML file operations.
+*   **Robust File Operations:** Simplified wrappers for recursive file searching, batch renaming, and bulk file-type conversion.
+*   **Performance Profiling:** A decorator-based execution timer to track function latency with millisecond precision and logging support.
+*   **String Sanitization:** Native support for slugifying complex strings and stripping non-printable characters for clean data ingestion.
+*   **Memory-Efficient Iterators:** Lazy-loading utilities for processing massive CSV and JSON files without exhausting system RAM.
 
 ## Installation
 
-Install the package directly via `pip`:
+Install the package directly via pip:
 
 ```bash
 pip install python-utils-41
 ```
 
-Or build from source:
+Or, if you are working within a virtual environment, ensure your requirements file is updated:
 
 ```bash
-git clone https://github.com/Developer/python-utils-41.git
-cd python-utils-41
-pip install .
+echo "python-utils-41" >> requirements.txt
+pip install -r requirements.txt
 ```
 
-## Quick Start
+## Usage
+
+Utilize the performance decorator to monitor function execution time or use the file utilities to manage your workspace efficiently:
 
 ```python
-from python_utils_41.decorators import retry
-from python_utils_41.dicts import deep_merge
-from python_utils_41.strings import slugify
+from pyutils41.profiler import time_execution
+from pyutils41.files import get_files_by_extension
 
-# Retry an operation up to 3 times with exponential backoff
-@retry(max_attempts=3, delay=1.0, backoff_factor=2.0)
-def connect_to_service():
-    # Simulation of a network call
-    return {"status": "connected"}
+# Monitor function performance
+@time_execution(logger=print)
+def process_data(data):
+    # Process logic here
+    return len(data)
 
-# Merge nested configurations safely
-base_config = {"database": {"host": "localhost", "port": 5432}}
-override_config = {"database": {"port": 5433, "user": "admin"}}
-final_config = deep_merge(base_config, override_config)
-
-# Generate URL-friendly slugs
-clean_url = slugify("Release v1.0: New Features & Bug Fixes!")
-print(clean_url)  # Output: release-v10-new-features-and-bug-fixes
+# Quickly find all logs in a directory
+logs = get_files_by_extension("./logs", ".log")
+print(f"Found {len(logs)} log files.")
 ```
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
