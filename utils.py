@@ -1,37 +1,43 @@
-import json
-from typing import Any, Dict, Optional
+import functools
+import random
+import time
+from typing import Any, Callable, Tuple, Type, TypeVar
 
-def deep_get(data: Dict[str, Any], path: str, default: Any = None) -> Any:
-    """
-    Retrieves a nested value from a dictionary using dot notation.
-    """
-    keys = path.split('.')
-    val = data
-    try:
-        for key in keys:
-            val = val[key]
-        return val
-    except (KeyError, TypeError, AttributeError):
-        return default
+T = TypeVar("T")
 
-def sanitize_payload(data: Any) -> Any:
-    """
-    Recursively cleans data to ensure JSON compatibility.
-    """
-    if isinstance(data, dict):
-        return {str(k): sanitize_payload(v) for k, v in data.items()}
-    elif isinstance(data, list):
-        return [sanitize_payload(i) for i in data]
-    elif isinstance(data, (str, int, float, bool)) or data is None:
-        return data
-    return str(data)
 
-def load_json_file(filepath: str) -> Optional[Dict[str, Any]]:
+def retry_network_op(
+    max_retries: int = 3,
+    initial_delay: float = 1.0,
+    backoff_factor: float = 2.0,
+    jitter: bool = True,
+    retryable_exceptions: Tuple[Type[Exception], ...] = (Exception,),
+) -> Callable:
+    """Decorator that retries network or fragile operations with exponential backoff.
+
+    Args:
+        max_retries: Maximum number of attempts before raising the exception.
+        initial_delay: Initial waiting time in seconds between retries.
+        backoff_factor: Multiplier applied to delay after each failed attempt.
+        jitter: Adds randomness to delay to prevent thundering herd issues.
+        retryable_exceptions: Tuple of exception classes to intercept and retry.
     """
-    Safe loading of configuration or data files.
-    """
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return None
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> T:
+            delay = initial_delay
+            for attempt in range(1, max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except retryable_exceptions as exc:
+                    if attempt == max_retries:
+                        raise exc
+                    
+                    sleep_time = delay * (1 + random.random()) if jitter else delay
+                    time.sleep(sleep_time)
+                    delay *= backoff_factor
+            
+            raise RuntimeError("Retry limit reached without catching exception")
+            
+        return wrapper
+    return decorator
