@@ -1,60 +1,64 @@
 import json
 import os
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any, Dict, Optional, Union
+
+DEFAULT_CONFIG: Dict[str, Any] = {
+    "app_name": "PythonUtilsApp",
+    "debug": False,
+    "log_level": "INFO",
+    "timeout": 30,
+    "max_retries": 3,
+    "allowed_hosts": ["localhost", "127.0.0.1"],
+}
 
 
 class ConfigLoader:
-    """Manages application configuration loading with default fallbacks."""
+    """Loads configuration from JSON files and environment variables with default values."""
 
-    def __init__(self, defaults: Optional[Dict[str, Any]] = None) -> None:
-        self._config: Dict[str, Any] = defaults.copy() if defaults else {}
+    def __init__(self, defaults: Optional[Dict[str, Any]] = None):
+        self._config: Dict[str, Any] = dict(defaults or DEFAULT_CONFIG)
 
-    def load_from_dict(self, data: Dict[str, Any]) -> None:
-        """Update configuration from a dictionary."""
-        self._update_nested(self._config, data)
+    def load_from_json(self, file_path: Union[str, Path]) -> Dict[str, Any]:
+        """Loads settings from a JSON file and updates the current configuration."""
+        path = Path(file_path)
+        if not path.is_file():
+            raise FileNotFoundError(f"Configuration file not found: {path}")
 
-    def load_from_json(self, filepath: str) -> bool:
-        """Load configuration settings from a JSON file."""
-        if not os.path.exists(filepath):
-            return False
+        with open(path, "r", encoding="utf-8") as file:
+            data = json.load(file)
+            if not isinstance(data, dict):
+                raise ValueError("JSON configuration must contain a top-level dictionary.")
+            self._config.update(data)
+        return self._config
 
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, dict):
-                    self.load_from_dict(data)
-                    return True
-        except (json.JSONDecodeError, OSError):
-            return False
-        return False
-
-    def load_from_env(self, prefix: str = "") -> None:
-        """Load configuration values from environment variables."""
-        for key, value in os.environ.items():
-            if prefix and not key.startswith(prefix):
-                continue
-            config_key = key[len(prefix):].lower() if prefix else key.lower()
-            self._config[config_key] = value
+    def load_from_env(self, prefix: str = "APP_") -> Dict[str, Any]:
+        """Overrides values using environment variables matching the given prefix."""
+        for key, current_val in list(self._config.items()):
+            env_key = f"{prefix}{key.upper()}"
+            if env_key in os.environ:
+                raw_val = os.environ[env_key]
+                self._config[key] = self._parse_env_value(raw_val, type(current_val))
+        return self._config
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Retrieve a configuration value using dot notation for nested keys."""
-        parts = key.split(".")
-        current = self._config
-        for part in parts:
-            if isinstance(current, dict) and part in current:
-                current = current[part]
-            else:
-                return default
-        return current
+        """Retrieves a configuration value by key with optional default fallback."""
+        return self._config.get(key, default)
 
-    def _update_nested(self, target: Dict[str, Any], source: Dict[str, Any]) -> None:
-        """Recursively update target dictionary with source dictionary values."""
-        for key, value in source.items():
-            if isinstance(value, dict) and key in target and isinstance(target[key], dict):
-                self._update_nested(target[key], value)
-            else:
-                target[key] = value
+    @property
+    def config(self) -> Dict[str, Any]:
+        """Returns a copy of the current configuration mapping."""
+        return dict(self._config)
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Return a copy of the current configuration as a dictionary."""
-        return self._config.copy()
+    @staticmethod
+    def _parse_env_value(value: str, target_type: type) -> Any:
+        """Helper to cast environment string values to matching data types."""
+        if target_type == bool:
+            return value.lower() in ("true", "1", "yes", "on")
+        if target_type == int:
+            return int(value)
+        if target_type == float:
+            return float(value)
+        if target_type == list:
+            return [item.strip() for item in value.split(",")]
+        return value
