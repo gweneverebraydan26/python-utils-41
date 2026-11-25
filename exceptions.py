@@ -1,62 +1,34 @@
-"""Custom exception hierarchy for application-wide error handling."""
+class UtilsError(Exception):
+    """Base exception for python-utils-41 package."""
 
-from typing import Any, Dict, Optional
+class ConfigurationError(UtilsError):
+    """Raised when configuration values are invalid."""
 
+class ValidationError(UtilsError):
+    """Raised when data validation fails."""
 
-class BaseAppError(Exception):
-    """Base exception class for all custom project errors."""
+def raise_if_none(value, message="Value cannot be None"):
+    """Checks if a value is None and raises ValidationError."""
+    if value is None:
+        raise ValidationError(message)
 
-    def __init__(
-        self,
-        message: str,
-        payload: Optional[Dict[str, Any]] = None,
-        code: Optional[str] = None,
-    ) -> None:
-        super().__init__(message)
-        self.message = message
-        self.payload = payload or {}
-        self.code = code or "INTERNAL_ERROR"
+def handle_exception(e, logger=None):
+    """Standardizes exception logging and re-raising."""
+    if logger:
+        logger.error(f"Exception caught: {type(e).__name__} - {str(e)}")
+    raise e
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize exception details to a structured dictionary."""
-        return {
-            "error": self.__class__.__name__,
-            "message": self.message,
-            "code": self.code,
-            "payload": self.payload,
-        }
+class ExceptionContext:
+    """Context manager to suppress or re-raise errors."""
+    def __init__(self, suppress=False):
+        self.suppress = suppress
 
-    def __str__(self) -> str:
-        if self.payload:
-            return f"[{self.code}] {self.message} | Details: {self.payload}"
-        return f"[{self.code}] {self.message}"
+    def __enter__(self):
+        return self
 
-
-class ValidationError(BaseAppError):
-    """Raised when input validation or schema checks fail."""
-
-    def __init__(self, message: str, payload: Optional[Dict[str, Any]] = None) -> None:
-        super().__init__(message, payload=payload, code="VALIDATION_ERROR")
-
-
-class ConfigurationError(BaseAppError):
-    """Raised when a required configuration setting is missing or invalid."""
-
-    def __init__(self, message: str, payload: Optional[Dict[str, Any]] = None) -> None:
-        super().__init__(message, payload=payload, code="CONFIG_ERROR")
-
-
-class ProcessingError(BaseAppError):
-    """Raised when data processing or pipeline execution fails."""
-
-    def __init__(self, message: str, payload: Optional[Dict[str, Any]] = None) -> None:
-        super().__init__(message, payload=payload, code="PROCESSING_ERROR")
-
-
-class ResourceNotFoundError(BaseAppError):
-    """Raised when a requested resource or key cannot be located."""
-
-    def __init__(self, resource_id: str, resource_type: str = "Resource") -> None:
-        message = f"{resource_type} '{resource_id}' was not found"
-        payload = {"resource_id": resource_id, "resource_type": resource_type}
-        super().__init__(message, payload=payload, code="NOT_FOUND")
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            if self.suppress:
+                return True
+            return False
+        return True
