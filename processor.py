@@ -1,45 +1,27 @@
-import typing as t
-from collections.abc import Iterable
+import json
+import os
+from typing import Any, Dict, List, Optional
 
-def batch_process(data: Iterable[t.Any], batch_size: int = 10) -> t.Generator[list[t.Any], None, None]:
-    """
-    splits an iterable into smaller chunks for memory-efficient processing
-    """
-    if batch_size <= 0:
-        raise ValueError("batch size must be positive")
-    
-    batch = []
-    for item in data:
-        batch.append(item)
-        if len(batch) >= batch_size:
-            yield batch
-            batch = []
-    
-    if batch:
-        yield batch
+def load_json(file_path: str) -> Dict[str, Any]:
+    """Load and parse a JSON file safely."""
+    if not os.path.exists(file_path):
+        return {}
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
-def clean_data_dict(data: dict[str, t.Any]) -> dict[str, t.Any]:
-    """
-    recursively removes keys with null values from a dictionary
-    """
-    cleaned = {}
-    for key, value in data.items():
-        if isinstance(value, dict):
-            value = clean_data_dict(value)
-        
-        if value is not None:
-            cleaned[key] = value
-            
-    return cleaned
+def save_json(file_path: str, data: Dict[str, Any]) -> None:
+    """Write data to a JSON file."""
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4)
 
-def flatten_list(nested_list: list[t.Any]) -> list[t.Any]:
-    """
-    flattens a nested list structure into a single dimension
-    """
-    flat = []
-    for item in nested_list:
-        if isinstance(item, list):
-            flat.extend(flatten_list(item))
-        else:
-            flat.append(item)
-    return flat
+def chunk_list(data: List[Any], size: int) -> List[List[Any]]:
+    """Split a list into smaller chunks."""
+    return [data[i:i + size] for i in range(0, len(data), size)]
+
+def get_env_variable(key: str, default: Optional[str] = None) -> Optional[str]:
+    """Retrieve environment variable with fallback."""
+    return os.environ.get(key, default)
+
+def format_dict_keys(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert dictionary keys to lowercase."""
+    return {str(k).lower(): v for k, v in data.items()}
