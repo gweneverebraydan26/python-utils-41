@@ -1,27 +1,33 @@
-import json
-import os
-from typing import Any, Dict, List, Optional
+import functools
+from typing import Callable, Any, Dict
 
-def load_json(file_path: str) -> Dict[str, Any]:
-    """Load and parse a JSON file safely."""
-    if not os.path.exists(file_path):
-        return {}
-    with open(file_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+# Cache for repetitive computational tasks
+_memoization_cache: Dict[tuple, Any] = {}
 
-def save_json(file_path: str, data: Dict[str, Any]) -> None:
-    """Write data to a JSON file."""
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=4)
+def memoize_processor(func: Callable) -> Callable:
+    """Decorator to cache function results based on arguments."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs) -> Any:
+        key = (func.__name__, args, frozenset(kwargs.items()))
+        if key not in _memoization_cache:
+            _memoization_cache[key] = func(*args, **kwargs)
+        return _memoization_cache[key]
+    return wrapper
 
-def chunk_list(data: List[Any], size: int) -> List[List[Any]]:
-    """Split a list into smaller chunks."""
-    return [data[i:i + size] for i in range(0, len(data), size)]
+class DataProcessor:
+    """High-performance batch processor for numeric datasets."""
+    def __init__(self, threshold: float = 0.5):
+        self.threshold = threshold
 
-def get_env_variable(key: str, default: Optional[str] = None) -> Optional[str]:
-    """Retrieve environment variable with fallback."""
-    return os.environ.get(key, default)
+    @memoize_processor
+    def transform(self, data: tuple) -> list:
+        """Applies vectorized-style transformations to input sequences."""
+        return [x * 2 if x > self.threshold else x / 2 for x in data]
 
-def format_dict_keys(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Convert dictionary keys to lowercase."""
-    return {str(k).lower(): v for k, v in data.items()}
+    def batch_process(self, datasets: list[tuple]) -> list[list]:
+        """Process list of tuples efficiently."""
+        return [self.transform(ds) for ds in datasets]
+
+def clear_processor_cache() -> None:
+    """Manual memory reclamation for the cache."""
+    _memoization_cache.clear()
