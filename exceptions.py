@@ -1,34 +1,53 @@
-class UtilsError(Exception):
-    """Base exception for python-utils-41 package."""
+"""Custom exception classes for general utility operations."""
 
-class ConfigurationError(UtilsError):
-    """Raised when configuration values are invalid."""
+from typing import Any, Optional
 
-class ValidationError(UtilsError):
+
+class UtilsBaseError(Exception):
+    """Base exception for all python-utils errors."""
+
+    def __init__(self, message: str, details: Optional[dict[str, Any]] = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.details = details or {}
+
+    def __str__(self) -> str:
+        if self.details:
+            formatted_details = ", ".join(f"{k}={v!r}" for k, v in self.details.items())
+            return f"{self.message} ({formatted_details})"
+        return self.message
+
+
+class ValidationError(UtilsBaseError):
     """Raised when data validation fails."""
 
-def raise_if_none(value, message="Value cannot be None"):
-    """Checks if a value is None and raises ValidationError."""
-    if value is None:
-        raise ValidationError(message)
+    def __init__(self, message: str, field_name: Optional[str] = None, value: Any = None) -> None:
+        details = {}
+        if field_name is not None:
+            details["field"] = field_name
+        if value is not None:
+            details["value"] = value
+        super().__init__(message, details=details)
 
-def handle_exception(e, logger=None):
-    """Standardizes exception logging and re-raising."""
-    if logger:
-        logger.error(f"Exception caught: {type(e).__name__} - {str(e)}")
-    raise e
 
-class ExceptionContext:
-    """Context manager to suppress or re-raise errors."""
-    def __init__(self, suppress=False):
-        self.suppress = suppress
+class ConfigurationError(UtilsBaseError):
+    """Raised when configuration parameters are invalid or missing."""
 
-    def __enter__(self):
-        return self
+    pass
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is not None:
-            if self.suppress:
-                return True
-            return False
-        return True
+
+class ProcessingError(UtilsBaseError):
+    """Raised when generic data processing fails."""
+
+    def __init__(self, message: str, original_cause: Optional[Exception] = None) -> None:
+        details = {}
+        if original_cause:
+            details["cause"] = str(original_cause)
+        super().__init__(message, details=details)
+        self.original_cause = original_cause
+
+
+class ResourceNotFoundError(UtilsBaseError):
+    """Raised when a requested resource or file cannot be located."""
+
+    pass
