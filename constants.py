@@ -1,33 +1,29 @@
 import enum
-from typing import Final, Dict, Any
+from typing import Dict, Any
 
-# general constants for data handling operations
-DEFAULT_ENCODING: Final[str] = "utf-8"
-CHUNK_SIZE: Final[int] = 4096
-MAX_RETRIES: Final[int] = 3
+class DataFormat(enum.Enum):
+    """Supported serialization formats for data processing."""
+    JSON = "json"
+    YAML = "yaml"
+    CSV = "csv"
 
-class DataStatus(enum.Enum):
-    SUCCESS = "success"
-    FAILURE = "failure"
-    PENDING = "pending"
+class ConfigDefaults:
+    """Default application configuration constants."""
+    MAX_RETRIES: int = 3
+    TIMEOUT_SECONDS: float = 30.0
+    CHUNK_SIZE: int = 1024
+    ENCODING: str = "utf-8"
 
-# mapping of common content types
-CONTENT_TYPES: Final[Dict[str, str]] = {
-    "json": "application/json",
-    "csv": "text/csv",
-    "txt": "text/plain",
-    "yaml": "application/x-yaml"
-}
-
-def get_timeout_settings(mode: str = "standard") -> int:
-    """returns integer timeout duration based on mode."""
-    settings = {
-        "fast": 5,
-        "standard": 30,
-        "slow": 120
+def get_environment_defaults() -> Dict[str, Any]:
+    """Return baseline environment configuration mapping."""
+    return {
+        "retries": ConfigDefaults.MAX_RETRIES,
+        "timeout": ConfigDefaults.TIMEOUT_SECONDS,
+        "chunk_size": ConfigDefaults.CHUNK_SIZE,
+        "encoding": ConfigDefaults.ENCODING
     }
-    return settings.get(mode, 30)
 
-# validation constraints
-MIN_PASSWORD_LENGTH: Final[int] = 12
-ALLOWED_EXTENSIONS: Final[set] = {"json", "csv", "txt"}
+# Status codes for internal utility operations
+STATUS_SUCCESS: int = 200
+STATUS_ERROR: int = 500
+STATUS_INVALID: int = 400
